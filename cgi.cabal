@@ -4,7 +4,7 @@ Copyright: The authors
 Maintainer: libraries@haskell.org
 Author: FIXME
 License: BSD3
-build-depends: haskell98, network
+build-depends: haskell98, base, network, parsec, mtl
 Extensions: 
 Synopsis: Library for writing CGI programs.
 Exposed-Modules: 
