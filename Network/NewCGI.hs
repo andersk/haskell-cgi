@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  bjorn@bringert.net
 -- Stability   :  experimental
--- Portability :  non-portable (uses Network.URI)
+-- Portability :  non-portable (uses Network.URI and Control.Monad.State)
 --
 -- Simple library for writing CGI programs.
 --
@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Network.CGI (
+module Network.NewCGI (
 			  CGI, CGIResult
 			 , output, redirect
 			 , io, getVar, 
@@ -35,7 +35,7 @@ import Data.Maybe (listToMaybe)
 import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
-import System.Environment ( getEnv )
+import System.Environment (getEnv)
 
 data CGIState = CGIState {
 			  cgiVars :: [(String,String)],
@@ -58,7 +58,8 @@ data CGIResult = CGIOutput String
 io :: IO a -> CGI a
 io = lift
 
--- | note: if using Windows, you might need to wrap 'withSocketsDo' round main.
+-- | Run a CGI action.
+--   Note: if using Windows, you might need to wrap 'withSocketsDo' round main.
 runCGI :: CGI CGIResult -> IO ()
 runCGI f = do qs <- getQueryString
 	      vars <- getCgiVars
@@ -93,9 +94,11 @@ doRedirect url hs =
 -- * Output / redirect
 --
 
+-- | Output a string.
 output :: String -> CGI CGIResult
 output str = return $ CGIOutput str
 
+-- | Redirect to some location.
 redirect :: String -> CGI CGIResult
 redirect str = return $ CGIRedirect str
 
@@ -162,7 +165,6 @@ setHeader :: String -> String -> CGI ()
 setHeader name value = 
     modify (\s -> s{cgiResponseHeaders 
 		    = tableSet name value (cgiResponseHeaders s)})
-
 
 showHeader :: (String,String) -> String
 showHeader (n,v) = n ++ ": " ++ v

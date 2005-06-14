@@ -1,0 +1,13 @@
+Name: cgi
+Version: 0.1
+Copyright: The authors
+Maintainer: libraries@haskell.org
+Author: FIXME
+License: BSD3
+build-depends: haskell98, network
+Extensions: 
+Synopsis: Library for writing CGI programs.
+Exposed-Modules: 
+   Network.NewCGI,
+   Network.HTTP.Cookie                   
+ghc-options: -O2
