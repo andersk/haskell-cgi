@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  Bjorn Bringert <bjorn@bringert.net>
 -- Stability   :  experimental
--- Portability :  non-portable (uses Network.URI)
+-- Portability :  portable
 --
 --  General server side HTTP cookie library.
 --  Based on <http://wp.netscape.com/newsref/std/cookie_spec.html>
@@ -41,20 +41,20 @@ type Headers = [(String,String)]
 
 -- | Contains all information about a cookie set by the server.
 data Cookie = Cookie {
-		      -- | Name of the cookie
+		      -- | Name of the cookie.
 		      cookieName :: String,
-		      -- | Value of the cookie
+		      -- | Value of the cookie.
 		      cookieValue :: String,
 		      -- | Expiry date of the cookie. If 'Nothing', the
 		      --   cookie expires when the browser sessions ends.
 		      --   If the date is in the psat, the client should
 		      --   delete cookie the cookie immediately.
 		      cookieExpires :: Maybe CalendarTime,
-		      -- | The domain suffix to which this cookie will be sent
+		      -- | The domain suffix to which this cookie will be sent.
 		      cookieDomain :: Maybe String,
-		      -- | The path to which this cookie will be sent
+		      -- | The path to which this cookie will be sent.
 		      cookiePath :: Maybe String,
-		      -- | 'True' is this cookie should only be sent using
+		      -- | 'True' if this cookie should only be sent using
 		      --   secure means.
 		      cookieSecure :: Bool
 		     }
@@ -188,7 +188,7 @@ isAllowedChar _ = True
 -- Utilities
 --
 
--- | Compare two strings from equality, ignoring case.
+-- | Compare two strings for equality, ignoring case.
 equalsIgnoreCase :: String -> String -> Bool
 equalsIgnoreCase x y = map toLower x == map toLower y
 
