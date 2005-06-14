@@ -13,22 +13,22 @@
 --
 -- Based on the original Haskell binding for CGI:
 --
--- Original Version by Erik Meijer <mailto:erik@cs.ruu.nl>
--- Further hacked on by Sven Panne <mailto:sven.panne@aedion.de>
--- Further hacking by Andy Gill <mailto:andy@galconn.com>
+-- Original Version by Erik Meijer <mailto:erik\@cs.ruu.nl>
+-- Further hacked on by Sven Panne <mailto:sven.panne\@aedion.de>
+-- Further hacking by Andy Gill <mailto:andy\@galconn.com>
 --
 -----------------------------------------------------------------------------
 
-module Network.NewCGI (
-			  CGI, CGIResult
-			 , output, redirect
-			 , io, getVar, 
-			 , getInput, readInput, getInputs
-			 , runCGI
-			 , setHeader
-			 , Cookie(..), newCookie
-			 , getCookie, setCookie, deleteCookie
-			 ) where
+module Network.NewCGI 
+  (CGI, CGIResult
+  , output, redirect
+  , io, getVar
+  , getInput, readInput, getInputs
+  , runCGI
+  , setHeader
+  , Cookie(..), newCookie
+  , getCookie, setCookie, deleteCookie
+  ) where
 
 import Control.Monad.State
 import Data.Maybe (listToMaybe)
@@ -91,7 +91,7 @@ doRedirect url hs =
     putStrLn ""
 
 --
--- * Output / redirect
+-- * Output \/ redirect
 --
 
 -- | Output a string.
@@ -180,7 +180,7 @@ initHeaders = []
 --
 
 
--- | Get the name-value pairs from application/x-www-form-urlencoded data
+-- | Get the name-value pairs from application\/x-www-form-urlencoded data
 formDecode :: String -> [(String,String)]
 formDecode "" = []
 formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
@@ -188,7 +188,7 @@ formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
 	  (n,v) = break (=='=') nv
 
 
--- | Convert a single value from the application/x-www-form-urlencoded encoding.
+-- | Convert a single value from the application\/x-www-form-urlencoded encoding.
 urlDecode :: String -> String
 urlDecode = unEscapeString . replace '+' ' '
 

@@ -19,7 +19,7 @@
 module Network.HTTP.Cookie (
 			    Headers, Cookie(..)
 			    , newCookie
-			    , getCookie, setCookie, 
+			    , getCookie, setCookie
 			    , findCookie, deleteCookie
 			    , showCookie, readCookies
 			   ) where
