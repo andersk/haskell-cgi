@@ -1,8 +1,8 @@
 Name: cgi
 Version: 0.1
-Copyright: The authors
+Copyright: Bjorn Bringert, Erik Meijer, Sven Panne, Andy Gill
 Maintainer: libraries@haskell.org
-Author: FIXME
+Author: Bjorn Bringert
 License: BSD3
 build-depends: haskell98, base, network, parsec, mtl
 Extensions: 
