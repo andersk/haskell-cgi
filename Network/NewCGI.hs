@@ -44,7 +44,8 @@ import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
 import System.Environment (getEnv)
-import System.IO (Handle, hPutStr, hPutStrLn, hGetContents, stdin, stdout)
+import System.IO (Handle, hPutStr, hPutStrLn, hGetContents, 
+		  stdin, stdout, hFlush)
 
 -- imports only needed by the compatibility functions
 import Control.Concurrent (forkIO)
@@ -63,8 +64,8 @@ data CGIState = CGIState {
 			 }
 	      deriving (Show, Read, Eq, Ord)
 
--- | The CGI monad. FIXME: maybe this should be abstract?
-type CGI a = StateT CGIState IO a 
+-- | The CGI monad.
+newtype CGI a = CGI { unCGI :: StateT CGIState IO a }
 
 -- | The result of a CGI program.
 data CGIResult = CGIOutput String
@@ -75,9 +76,23 @@ data CGIResult = CGIOutput String
 -- * CGI monad
 --
 
+instance Monad CGI where
+    c >>= f = CGI (unCGI c >>= unCGI . f)
+    return = CGI . return
+    -- FIXME: should we have an error monad?
+    fail s = error s
+
 -- | Perform an IO action in the CGI monad
 io :: IO a -> CGI a
-io = lift
+io = CGI . lift
+
+-- | Get something from the CGI state.
+cgiGet :: (CGIState -> a) -> CGI a
+cgiGet = CGI . gets
+
+-- | Modify the CGI state.
+cgiModify :: (CGIState -> CGIState) -> CGI ()
+cgiModify = CGI . modify
 
 -- | Run a CGI action. Typically called by the main function.
 --   Reads input from stdin and writes to stdout.
@@ -107,7 +122,7 @@ hRunCGIEnv vars hin hout f
 			  cgiInput = formDecode qs,
 			  cgiResponseHeaders = initHeaders
 			 }
-	 (output,s') <- runStateT f s
+	 (output,s') <- runStateT (unCGI f) s
 	 let hs = cgiResponseHeaders s'
 	 case output of
 		     CGIOutput str   -> hPutStr hout (formatOutput str hs)
@@ -150,11 +165,11 @@ redirect str = return $ CGIRedirect str
 -- > remoteAddr <- getVar "REMOTE_ADDR"
 getVar :: String             -- ^ The name of the variable.
        -> CGI (Maybe String)
-getVar name = gets (lookup name . cgiVars)
+getVar name = liftM (lookup name) getVars
 
 -- | Get all CGI environment variables and their values.
 getVars :: CGI [(String,String)]
-getVars = gets cgiVars
+getVars = cgiGet cgiVars
 
 --
 -- * Query input
@@ -167,7 +182,7 @@ getVars = gets cgiVars
 getInput :: String             -- ^ The name of the variable.
 	 -> CGI (Maybe String) -- ^ The value of the variable,
                                --   or Nothing, if it was not set.
-getInput name = gets (lookup name . cgiInput)
+getInput name = liftM (lookup name) getInputs
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: Read a => 
@@ -179,7 +194,7 @@ readInput name = liftM (>>= fmap fst . listToMaybe . reads) (getInput name)
 
 -- | Get all input variables and their values.
 getInputs :: CGI [(String,String)]
-getInputs = gets cgiInput
+getInputs = cgiGet cgiInput
 
 --
 -- * Cookies
@@ -195,7 +210,7 @@ getCookie name = do
 -- | Set a cookie.
 setCookie :: Cookie -> CGI ()
 setCookie cookie = 
-    modify (\s -> s{cgiResponseHeaders 
+    cgiModify (\s -> s{cgiResponseHeaders 
 		    = Cookie.setCookie cookie (cgiResponseHeaders s)})
 
 -- | Delete a cookie from the client
@@ -215,7 +230,7 @@ setHeader :: String -- ^ Header name.
 	  -> String -- ^ Header value.
 	  -> CGI ()
 setHeader name value = 
-    modify (\s -> s{cgiResponseHeaders 
+    cgiModify (\s -> s{cgiResponseHeaders 
 		    = tableSet name value (cgiResponseHeaders s)})
 
 showHeader :: (String,String) -> ShowS
