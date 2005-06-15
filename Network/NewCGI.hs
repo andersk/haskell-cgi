@@ -79,10 +79,10 @@ data CGIResult = CGIOutput String
 instance Monad CGI where
     c >>= f = CGI (unCGI c >>= unCGI . f)
     return = CGI . return
-    -- FIXME: should we have an error monad?
-    fail s = error s
+    -- FIXME: should we have an error monad instead?
+    fail s = io (fail s)
 
--- | Perform an IO action in the CGI monad
+-- | Perform an IO action in the CGI monad.
 io :: IO a -> CGI a
 io = CGI . lift
 
@@ -95,13 +95,15 @@ cgiModify :: (CGIState -> CGIState) -> CGI ()
 cgiModify = CGI . modify
 
 -- | Run a CGI action. Typically called by the main function.
---   Reads input from stdin and writes to stdout.
---   Note: if using Windows, you might need to wrap 'withSocketsDo' round main.
+--   Reads input from stdin and writes to stdout. Gets
+--   CGI environment variables from the program environment.
+--   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 runCGI :: CGI CGIResult -> IO ()
 runCGI = hRunCGI stdin stdout
 
--- | Run a CGI action. Typically called by the main function.
---   Note: if using Windows, you might need to wrap 'withSocketsDo' round main.
+-- | Run a CGI action. Gets
+--   CGI environment variables from the program environment.
+--   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 hRunCGI :: Handle -- ^ Handle that input will be read from.
 	-> Handle -- ^ Handle that output will be written to.
 	-> CGI CGIResult -> IO ()
@@ -111,6 +113,7 @@ hRunCGI hin hout f = do vars <- getCgiVars
 -- | Run a CGI action in a given environment. This is like 'hRunCGI',
 --   but it is given the environment explicitly to support protocols 
 --   like FastCGI.
+--   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 hRunCGIEnv :: [(String,String)] -- ^ CGI environment variables.
 	      -> Handle -- ^ Handle that input will be read from.
 	      -> Handle -- ^ Handle that output will be written to.
