@@ -110,14 +110,9 @@ hRunCGIEnv vars hin hout f
 	 (output,s') <- runStateT f s
 	 let hs = cgiResponseHeaders s'
 	 case output of
-		     CGIOutput str   -> doOutput hout str hs
-		     CGIRedirect url -> doRedirect hout url hs
-
-doOutput :: Handle -> String -> [(String,String)] -> IO ()
-doOutput h str hs = hPutStr h (formatOutput str hs)
-
-doRedirect :: Handle -> String -> [(String,String)] -> IO ()
-doRedirect h url hs = hPutStr h (formatRedirect url hs)
+		     CGIOutput str   -> hPutStr hout (formatOutput str hs)
+		     CGIRedirect url -> hPutStr hout (formatRedirect url hs)
+	 hFlush hout
 
 formatOutput :: String -> [(String,String)] -> String
 formatOutput str hs = formatResponse str hs'
