@@ -11,3 +11,9 @@ Exposed-Modules:
    Network.NewCGI,
    Network.HTTP.Cookie                   
 ghc-options: -O2
+
+
+Executable:     printinput
+Main-Is:        printinput.hs
+Hs-Source-Dir:  examples
+
