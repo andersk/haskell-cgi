@@ -39,7 +39,7 @@ module Network.NewCGI (
 import Control.Monad (liftM, unless)
 import Control.Monad.State (StateT, gets, lift, modify, runStateT)
 import Data.List (intersperse)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, fromMaybe)
 import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
@@ -97,48 +97,43 @@ cgiModify = CGI . modify
 -- | Run a CGI action. Typically called by the main function.
 --   Reads input from stdin and writes to stdout. Gets
 --   CGI environment variables from the program environment.
---   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 runCGI :: CGI CGIResult -> IO ()
 runCGI = hRunCGI stdin stdout
 
--- | Run a CGI action. Gets
---   CGI environment variables from the program environment.
---   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
+-- | Run a CGI action. Gets CGI environment variables from 
+--   the program environment.
 hRunCGI :: Handle -- ^ Handle that input will be read from.
 	-> Handle -- ^ Handle that output will be written to.
 	-> CGI CGIResult -> IO ()
-hRunCGI hin hout f = do vars <- getCgiVars
-			hRunCGIEnv vars hin hout f
+hRunCGI hin hout f = do env <- getCgiVars
+			input <- hGetContents hin
+			output <- runCGIEnv env input f
+			hPutStr hout output
+			hFlush hout
 
--- | Run a CGI action in a given environment. This is like 'hRunCGI',
---   but it is given the environment explicitly to support protocols 
---   like FastCGI.
---   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
-hRunCGIEnv :: [(String,String)] -- ^ CGI environment variables.
-	      -> Handle -- ^ Handle that input will be read from.
-	      -> Handle -- ^ Handle that output will be written to.
-	      -> CGI CGIResult -> IO ()
-hRunCGIEnv vars hin hout f 
-    = do qs <- getQueryString hin
-	 let s = CGIState{
-			  cgiVars = vars,
-			  cgiInput = formDecode qs,
-			  cgiResponseHeaders = initHeaders
-			 }
+-- | Run a CGI action in a given environment, using (lazy) strings 
+--   for input and output. 
+runCGIEnv :: [(String,String)] -- ^ CGI environment variables.
+	  -> String -- ^ Request body.
+	  -> CGI CGIResult -- ^ CGI action.
+	  -> IO String -- ^ Response (headers and content).
+runCGIEnv vars input f 
+    = do let qs = getQueryString vars input
+	     s = CGIState {
+			   cgiVars = vars,
+			   cgiInput = formDecode qs,
+			   cgiResponseHeaders = initHeaders
+			  }
 	 (output,s') <- runStateT (unCGI f) s
 	 let hs = cgiResponseHeaders s'
-	 case output of
-		     CGIOutput str   -> hPutStr hout (formatOutput str hs)
-		     CGIRedirect url -> hPutStr hout (formatRedirect url hs)
-	 hFlush hout
+	 return $ case output of
+           CGIOutput str   -> formatResponse str hs'
+	       where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
+	   CGIRedirect url -> formatResponse "" hs'
+	       where hs' = tableSet "Location" url hs
 
-formatOutput :: String -> [(String,String)] -> String
-formatOutput str hs = formatResponse str hs'
-    where hs' = tableAddIfNotPresent "Content-type" "text/html; charset=ISO-8859-1" hs
-
-formatRedirect :: String -> [(String,String)] -> String
-formatRedirect url hs = formatResponse "" hs'
-    where hs' = tableSet "Location" url hs
+defaultContentType :: String
+defaultContentType = "text/html; charset=ISO-8859-1"
 
 formatResponse :: String -> [(String,String)]-> String
 formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
@@ -193,7 +188,7 @@ readInput :: Read a =>
 	  -> CGI (Maybe a) -- ^ 'Nothing' if the variable does not exist
 	                   --   or if the value could not be interpreted
 	                   --   as the desired type.
-readInput name = liftM (>>= fmap fst . listToMaybe . reads) (getInput name)
+readInput name = liftM (>>= maybeRead) (getInput name)
 
 -- | Get all input variables and their values.
 getInputs :: CGI [(String,String)]
@@ -293,6 +288,12 @@ unlinesS = join "\n"
 join :: String -> [ShowS] -> ShowS
 join glue = concatS . intersperse (showString glue)
 
+maybeRead :: Read a => String -> Maybe a
+maybeRead = fmap fst . listToMaybe . reads
+
+maybeToM :: Monad m => String -> Maybe a -> m a
+maybeToM err = maybe (fail err) return
+
 --
 -- * CGI protocol stuff
 --
@@ -336,17 +337,27 @@ cgiVarNames =
    , "HTTP_USER_AGENT"
    ]                      
 
-getQueryString :: Handle -> IO String
-getQueryString h = do
-   method <- myGetEnv "REQUEST_METHOD"
-   case method of
-      "POST" -> do len <- myGetEnv "CONTENT_LENGTH"
-                   inp <- hGetContents h
-                   return (take (read len) inp)
-      _      -> myGetEnv "QUERY_STRING"
+-- | Returns the query string, or the empty string if there is 
+--   an error.
+getQueryString :: [(String,String)] -- ^ CGI environment variables.
+	       -> String            -- ^ Request body.
+	       -> String            -- ^ Query string.
+getQueryString env req =
+   case lookup "REQUEST_METHOD" env of
+      Just "POST" -> 
+        let len = lookup "CONTENT_LENGTH" env >>= maybeRead
+         in case len of
+   	   -- FIXME: we should check that length req == len,
+	   -- but that would force evaluation of req
+           Just l  -> take l req
+	   Nothing -> ""
+      _ -> lookupOrNil "QUERY_STRING" env
 
 myGetEnv :: String -> IO String
 myGetEnv v = Prelude.catch (getEnv v) (const (return ""))
+
+lookupOrNil :: String -> [(String,String)] -> String
+lookupOrNil n = fromMaybe "" . lookup n
 
 --
 -- * Compatibility functions
@@ -362,6 +373,7 @@ wrapper f = runCGI (wrapCGI f)
 
 -- | Compatibility wrapper for the old CGI interface.
 --   Runs a simple CGI server.
+--   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 pwrapper :: PortID  -- ^ The port to run the server on.
 	 -> ([(String,String)] -> IO Html) 
 	 -> IO ()
@@ -388,10 +400,12 @@ wrapCGI f = do
 	    html <- io (f (vs++is))
 	    output (renderHtml html)
 
-
+-- | Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 connectToCGIScript :: String -> PortID -> IO ()
 connectToCGIScript host portId
-     = do str <- getQueryString stdin
+     = do env <- getCgiVars
+          input <- getContents
+          let str = getQueryString env input
           h <- connectTo host portId
                  `Exception.catch`
                    (\ e -> abort "Cannot connect to CGI daemon." e)
