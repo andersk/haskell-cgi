@@ -36,7 +36,9 @@ module Network.NewCGI (
   , Html, wrapper, pwrapper, connectToCGIScript
   ) where
 
-import Control.Monad.State
+import Control.Monad (liftM, unless)
+import Control.Monad.State (StateT, gets, lift, modify, runStateT)
+import Data.List (intersperse)
 import Data.Maybe (listToMaybe)
 import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
@@ -88,9 +90,18 @@ runCGI = hRunCGI stdin stdout
 hRunCGI :: Handle -- ^ Handle that input will be read from.
 	-> Handle -- ^ Handle that output will be written to.
 	-> CGI CGIResult -> IO ()
-hRunCGI hin hout f 
+hRunCGI hin hout f = do vars <- getCgiVars
+			hRunCGIEnv vars hin hout f
+
+-- | Run a CGI action in a given environment. This is like 'hRunCGI',
+--   but it is given the environment explicitly to support protocols 
+--   like FastCGI.
+hRunCGIEnv :: [(String,String)] -- ^ CGI environment variables.
+	      -> Handle -- ^ Handle that input will be read from.
+	      -> Handle -- ^ Handle that output will be written to.
+	      -> CGI CGIResult -> IO ()
+hRunCGIEnv vars hin hout f 
     = do qs <- getQueryString hin
-	 vars <- getCgiVars
 	 let s = CGIState{
 			  cgiVars = vars,
 			  cgiInput = formDecode qs,
@@ -102,21 +113,22 @@ hRunCGI hin hout f
 		     CGIOutput str   -> doOutput hout str hs
 		     CGIRedirect url -> doRedirect hout url hs
 
-
 doOutput :: Handle -> String -> [(String,String)] -> IO ()
-doOutput h str hs = 
-    do
-    let hs' = tableAddIfNotPresent "Content-type" "text/html; charset=ISO-8859-1" hs
-    printHeaders h hs'
-    hPutStrLn h ""
-    hPutStr h str
+doOutput h str hs = hPutStr h (formatOutput str hs)
 
 doRedirect :: Handle -> String -> [(String,String)] -> IO ()
-doRedirect h url hs =
-    do
-    let hs' = tableSet "Location" url hs
-    printHeaders h hs'
-    hPutStrLn h ""
+doRedirect h url hs = hPutStr h (formatRedirect url hs)
+
+formatOutput :: String -> [(String,String)] -> String
+formatOutput str hs = formatResponse str hs'
+    where hs' = tableAddIfNotPresent "Content-type" "text/html; charset=ISO-8859-1" hs
+
+formatRedirect :: String -> [(String,String)] -> String
+formatRedirect url hs = formatResponse "" hs'
+    where hs' = tableSet "Location" url hs
+
+formatResponse :: String -> [(String,String)]-> String
+formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
 
 --
 -- * Output \/ redirect
@@ -211,11 +223,8 @@ setHeader name value =
     modify (\s -> s{cgiResponseHeaders 
 		    = tableSet name value (cgiResponseHeaders s)})
 
-showHeader :: (String,String) -> String
-showHeader (n,v) = n ++ ": " ++ v
-
-printHeaders :: Handle ->[(String,String)] -> IO ()
-printHeaders h = mapM_ (hPutStrLn h . showHeader)
+showHeader :: (String,String) -> ShowS
+showHeader (n,v) = showString n . showString ": " . showString v
 
 initHeaders :: [(String,String)]
 initHeaders = []
@@ -258,6 +267,18 @@ tableAddIfNotPresent k v [] = [(k,v)]
 tableAddIfNotPresent k v ((k',v'):ts) 
     | k == k' = (k',v') : ts
     | otherwise = (k',v') : tableAddIfNotPresent k v ts
+
+concatS :: [ShowS] -> ShowS
+concatS = foldr (.) id
+
+unwordsS :: [ShowS] -> ShowS
+unwordsS = join " "
+
+unlinesS :: [ShowS] -> ShowS
+unlinesS = join "\n"
+
+join :: String -> [ShowS] -> ShowS
+join glue = concatS . intersperse (showString glue)
 
 --
 -- * CGI protocol stuff

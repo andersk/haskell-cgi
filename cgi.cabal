@@ -17,3 +17,6 @@ Executable:     printinput
 Main-Is:        printinput.hs
 Hs-Source-Dir:  examples
 
+Executable:     redirect
+Main-Is:        redirect.hs
+Hs-Source-Dir:  examples
