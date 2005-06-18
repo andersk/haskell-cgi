@@ -22,7 +22,8 @@
 module Network.NewCGI (
   -- * The CGI monad
     CGI, CGIResult
-  , io, runCGI, hRunCGI
+  , io
+  , runCGI, hRunCGI, runCGIEnv
   -- * Output
   , output, redirect
   , setHeader
