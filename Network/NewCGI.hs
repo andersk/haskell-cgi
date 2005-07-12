@@ -107,9 +107,9 @@ hRunCGI :: Handle -- ^ Handle that input will be read from.
         -> Handle -- ^ Handle that output will be written to.
         -> CGI CGIResult -> IO ()
 hRunCGI hin hout f = do env <- getCgiVars
-                        input <- hGetContents hin
-                        output <- runCGIEnv env input f
-                        hPutStr hout output
+                        inp <- hGetContents hin
+                        outp <- runCGIEnv env inp f
+                        hPutStr hout outp
                         hFlush hout
 
 -- | Run a CGI action in a given environment, using (lazy) strings
@@ -118,16 +118,16 @@ runCGIEnv :: [(String,String)] -- ^ CGI environment variables.
           -> String -- ^ Request body.
           -> CGI CGIResult -- ^ CGI action.
           -> IO String -- ^ Response (headers and content).
-runCGIEnv vars input f
-    = do let qs = getQueryString vars input
+runCGIEnv vars inp f
+    = do let qs = getQueryString vars inp
              s = CGIState {
                            cgiVars = vars,
                            cgiInput = formDecode qs,
                            cgiResponseHeaders = initHeaders
                           }
-         (output,s') <- runStateT (unCGI f) s
+         (outp,s') <- runStateT (unCGI f) s
          let hs = cgiResponseHeaders s'
-         return $ case output of
+         return $ case outp of
            CGIOutput str   -> formatResponse str hs'
                where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
            CGIRedirect url -> formatResponse "" hs'
@@ -376,8 +376,9 @@ pwrapper pid f = do sock <- listenOn pid
                     acceptConnections fn sock
  where fn h = hRunCGI h h (wrapCGI f)
 
+acceptConnections :: (Handle -> IO ()) -> Socket -> IO ()
 acceptConnections fn sock = do
-  (h, SockAddrInet port haddr) <- accept' sock
+  (h, SockAddrInet _ _) <- accept' sock
   forkIO (fn h `finally` (hClose h))
   acceptConnections fn sock
 
@@ -414,6 +415,7 @@ abort msg e =
                    "<html><body>" ++ msg ++ "</body></html>")
        throw e
 
+sendBack :: Handle -> IO ()
 sendBack h = do s <- hGetLine h
                 putStrLn s
                 sendBack h
