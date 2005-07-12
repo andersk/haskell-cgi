@@ -280,9 +280,6 @@ tableAddIfNotPresent k v ((k',v'):ts)
 concatS :: [ShowS] -> ShowS
 concatS = foldr (.) id
 
-unwordsS :: [ShowS] -> ShowS
-unwordsS = join " "
-
 unlinesS :: [ShowS] -> ShowS
 unlinesS = join "\n"
 
@@ -291,9 +288,6 @@ join glue = concatS . intersperse (showString glue)
 
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . reads
-
-maybeToM :: Monad m => String -> Maybe a -> m a
-maybeToM err = maybe (fail err) return
 
 --
 -- * CGI protocol stuff
