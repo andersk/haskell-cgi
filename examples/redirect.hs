@@ -8,11 +8,11 @@ module Main where
 import Network.NewCGI
 
 printinput :: CGI CGIResult
-printinput = 
+printinput =
     do
     murl <- getInput "url"
-    case murl of 
+    case murl of
               Nothing  -> output "url parameter not set!"
-              Just url -> redirect url 
+              Just url -> redirect url
 
 main = runCGI printinput

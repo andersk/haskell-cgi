@@ -1,9 +1,9 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.HTTP.Cookie
--- Copyright   :  (c) Bjorn Bringert, 2004          
+-- Copyright   :  (c) Bjorn Bringert, 2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  Bjorn Bringert <bjorn@bringert.net>
 -- Stability   :  experimental
 -- Portability :  portable
@@ -68,15 +68,15 @@ data Cookie = Cookie {
 --   This client will expire when the browser sessions ends,
 --   will only be sent to the server and path which set it
 --   and may be sent using any means.
-newCookie :: String -- ^ Name 
+newCookie :: String -- ^ Name
           -> String -- ^ Value
           -> Cookie -- ^ Cookie
-newCookie name value = Cookie { cookieName = name, 
+newCookie name value = Cookie { cookieName = name,
                                 cookieValue = value,
                                 cookieExpires = Nothing,
-                                cookieDomain = Nothing, 
+                                cookieDomain = Nothing,
                                 cookiePath = Nothing,
-                                cookieSecure = False 
+                                cookieSecure = False
                               }
 
 --
@@ -84,17 +84,17 @@ newCookie name value = Cookie { cookieName = name,
 --
 
 -- | Get the value of a cookie from HTTP request headers
-getCookie :: Headers 
+getCookie :: Headers
           -> String       -- ^ Cookie name
           -> Maybe String -- ^ Cookie value
-getCookie hs name = 
+getCookie hs name =
     find (equalsIgnoreCase "Cookie" . fst) hs >>= findCookie name . snd
 
--- | Get the value of a cookie from a semicolon separated list of 
+-- | Get the value of a cookie from a semicolon separated list of
 --   name-value pairs such as that in the value of the Cookie: header
 --   or the HTTP_COOKIE CGI variable.
 findCookie :: String -- ^ Cookie name
-           -> String -- ^ Semicolon separated list of name-value pairs 
+           -> String -- ^ Semicolon separated list of name-value pairs
            -> Maybe String  -- ^ Cookie value, if found
 findCookie name s = maybeLast [ cv | (cn,cv) <- readCookies s, cn == name ]
 
@@ -107,7 +107,7 @@ setCookie :: Cookie
 setCookie c hs = hs ++ [("Set-Cookie", showCookie c)]
 
 
--- | Delete a cookie from the client by setting the cookie expiry date 
+-- | Delete a cookie from the client by setting the cookie expiry date
 --   to a date in the past.
 deleteCookie :: Cookie  -- ^ Cookie to delete. The only fields that matter
                         --   are 'cookieName', 'cookieDomain' and 'cookiePath'
@@ -136,7 +136,7 @@ deleteCookie c = c { cookieExpires = Just epoch }
 -- | Show a cookie on the format used as the value of the Set-Cookie header.
 showCookie :: Cookie -> String
 showCookie c = concat $ intersperse "; " $
-                showPair (cookieName c) (cookieValue c) 
+                showPair (cookieName c) (cookieValue c)
                  : catMaybes [expires, domain, path, secure]
     where expires = fmap (showPair "expires" . dateFmt) (cookieExpires c)
           domain = fmap (showPair "domain") (cookieDomain c)
@@ -150,12 +150,12 @@ showPair :: String -- ^ name
          -> String
 showPair name value = escape name ++ "=" ++ escape value
     where escape s = escapeString s (not . reserved)
-          
+
 
 -- | Gets all the cookies from a Cookie: header value
 readCookies :: String             -- ^ String to parse
             -> [(String,String)]  -- ^ Cookie name - cookie value pairs
-readCookies s = case parse parsePairs "" s of 
+readCookies s = case parse parsePairs "" s of
                                            Left _ -> []
                                            Right ps -> ps
 
@@ -174,7 +174,7 @@ parsePair = do
             value <- many (satisfy isAllowedChar)
             return (unEscapeString name, unEscapeString value)
 
--- | Returns true if the character is allowed unescaped in 
+-- | Returns true if the character is allowed unescaped in
 --   (the HTTP representation of) cookie names and values.
 isAllowedChar :: Char -> Bool
 isAllowedChar c | isSpace c = False

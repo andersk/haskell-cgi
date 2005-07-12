@@ -4,7 +4,7 @@
 -- Copyright   :  (c) The University of Glasgow 2001
 --                (c) Bjorn Bringert 2004-2005
 -- License     :  BSD-style (see the file libraries/network/LICENSE)
--- 
+--
 -- Maintainer  :  bjorn@bringert.net
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Monad.State)
@@ -45,7 +45,7 @@ import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
 import System.Environment (getEnv)
-import System.IO (Handle, hPutStr, hPutStrLn, hGetContents, 
+import System.IO (Handle, hPutStr, hPutStrLn, hGetContents,
                   stdin, stdout, hFlush)
 
 -- imports only needed by the compatibility functions
@@ -101,7 +101,7 @@ cgiModify = CGI . modify
 runCGI :: CGI CGIResult -> IO ()
 runCGI = hRunCGI stdin stdout
 
--- | Run a CGI action. Gets CGI environment variables from 
+-- | Run a CGI action. Gets CGI environment variables from
 --   the program environment.
 hRunCGI :: Handle -- ^ Handle that input will be read from.
         -> Handle -- ^ Handle that output will be written to.
@@ -112,13 +112,13 @@ hRunCGI hin hout f = do env <- getCgiVars
                         hPutStr hout output
                         hFlush hout
 
--- | Run a CGI action in a given environment, using (lazy) strings 
---   for input and output. 
+-- | Run a CGI action in a given environment, using (lazy) strings
+--   for input and output.
 runCGIEnv :: [(String,String)] -- ^ CGI environment variables.
           -> String -- ^ Request body.
           -> CGI CGIResult -- ^ CGI action.
           -> IO String -- ^ Response (headers and content).
-runCGIEnv vars input f 
+runCGIEnv vars input f
     = do let qs = getQueryString vars input
              s = CGIState {
                            cgiVars = vars,
@@ -184,7 +184,7 @@ getInput :: String             -- ^ The name of the variable.
 getInput name = liftM (lookup name) getInputs
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
-readInput :: Read a => 
+readInput :: Read a =>
              String        -- ^ The name of the variable.
           -> CGI (Maybe a) -- ^ 'Nothing' if the variable does not exist
                            --   or if the value could not be interpreted
@@ -208,8 +208,8 @@ getCookie name = do
 
 -- | Set a cookie.
 setCookie :: Cookie -> CGI ()
-setCookie cookie = 
-    cgiModify (\s -> s{cgiResponseHeaders 
+setCookie cookie =
+    cgiModify (\s -> s{cgiResponseHeaders
                     = Cookie.setCookie cookie (cgiResponseHeaders s)})
 
 -- | Delete a cookie from the client
@@ -228,8 +228,8 @@ deleteCookie cookie = setCookie (Cookie.deleteCookie cookie)
 setHeader :: String -- ^ Header name.
           -> String -- ^ Header value.
           -> CGI ()
-setHeader name value = 
-    cgiModify (\s -> s{cgiResponseHeaders 
+setHeader name value =
+    cgiModify (\s -> s{cgiResponseHeaders
                     = tableSet name value (cgiResponseHeaders s)})
 
 showHeader :: (String,String) -> ShowS
@@ -254,7 +254,7 @@ urlDecode :: String -> String
 urlDecode = unEscapeString . replace '+' ' '
 
 -- | Replace all instances of a value in a list by another value.
-replace :: Eq a => 
+replace :: Eq a =>
            a   -- ^ Value to look for
         -> a   -- ^ Value to replace it with
         -> [a] -- ^ Input list
@@ -264,7 +264,7 @@ replace x y = map (\z -> if z == x then y else z)
 -- | Set a value in a lookup table.
 tableSet :: Eq a => a -> b -> [(a,b)] -> [(a,b)]
 tableSet k v [] = [(k,v)]
-tableSet k v ((k',v'):ts) 
+tableSet k v ((k',v'):ts)
     | k == k' = (k,v) : ts
     | otherwise = (k',v') : tableSet k v ts
 
@@ -273,7 +273,7 @@ tableSet k v ((k',v'):ts)
 --   already, nothing is done.
 tableAddIfNotPresent :: Eq a => a -> b -> [(a,b)] -> [(a,b)]
 tableAddIfNotPresent k v [] = [(k,v)]
-tableAddIfNotPresent k v ((k',v'):ts) 
+tableAddIfNotPresent k v ((k',v'):ts)
     | k == k' = (k',v') : ts
     | otherwise = (k',v') : tableAddIfNotPresent k v ts
 
@@ -336,16 +336,16 @@ cgiVarNames =
    , "HTTP_UA_OS"
    , "HTTP_UA_PIXELS"
    , "HTTP_USER_AGENT"
-   ]                      
+   ]
 
--- | Returns the query string, or the empty string if there is 
+-- | Returns the query string, or the empty string if there is
 --   an error.
 getQueryString :: [(String,String)] -- ^ CGI environment variables.
                -> String            -- ^ Request body.
                -> String            -- ^ Query string.
 getQueryString env req =
    case lookup "REQUEST_METHOD" env of
-      Just "POST" -> 
+      Just "POST" ->
         let len = lookup "CONTENT_LENGTH" env >>= maybeRead
          in case len of
               -- FIXME: we should check that length req == len,
@@ -366,8 +366,8 @@ lookupOrNil n = fromMaybe "" . lookup n
 
 {-# DEPRECATED wrapper, pwrapper, connectToCGIScript "Use the new interface." #-}
 
--- | Compatibility wrapper for the old CGI interface. 
---   Output the output from a function from CGI environment and 
+-- | Compatibility wrapper for the old CGI interface.
+--   Output the output from a function from CGI environment and
 --   input variables to an HTML document.
 wrapper :: ([(String,String)] -> IO Html) -> IO ()
 wrapper f = runCGI (wrapCGI f)
@@ -376,7 +376,7 @@ wrapper f = runCGI (wrapCGI f)
 --   Runs a simple CGI server.
 --   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 pwrapper :: PortID  -- ^ The port to run the server on.
-         -> ([(String,String)] -> IO Html) 
+         -> ([(String,String)] -> IO Html)
          -> IO ()
 pwrapper pid f = do sock <- listenOn pid
                     acceptConnections fn sock
@@ -415,7 +415,7 @@ connectToCGIScript host portId
                `Prelude.catch` (\e -> unless (isEOFError e) (ioError e))
 
 abort :: String -> Exception -> IO a
-abort msg e = 
+abort msg e =
     do putStrLn ("Content-type: text/html\n\n" ++
                    "<html><body>" ++ msg ++ "</body></html>")
        throw e

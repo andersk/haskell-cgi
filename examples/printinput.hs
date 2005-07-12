@@ -8,7 +8,7 @@ module Main where
 import Network.NewCGI
 
 printinput :: CGI CGIResult
-printinput = 
+printinput =
     do
     setHeader "Content-type" "text/plain"
     vs <- getVars
