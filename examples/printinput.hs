@@ -14,7 +14,7 @@ printinput =
     vs <- getVars
     is <- getInputs
     output ("Environment:\n" ++ prVars vs
-	    ++ "\nInputs:\n" ++ prVars is)
+            ++ "\nInputs:\n" ++ prVars is)
 
 prVars vs = unlines [k ++ ": " ++ x | (k,x) <- vs ]
 
