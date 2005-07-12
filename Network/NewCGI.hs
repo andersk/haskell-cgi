@@ -46,7 +46,7 @@ import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
 import System.Environment (getEnv)
 import System.IO (Handle, hPutStr, hPutStrLn, hGetContents, 
-		  stdin, stdout, hFlush)
+                  stdin, stdout, hFlush)
 
 -- imports only needed by the compatibility functions
 import Control.Concurrent (forkIO)
@@ -59,19 +59,19 @@ import Text.Html (Html, renderHtml)
 
 
 data CGIState = CGIState {
-			  cgiVars :: [(String,String)],
-			  cgiInput :: [(String,String)],
-			  cgiResponseHeaders :: [(String,String)]
-			 }
-	      deriving (Show, Read, Eq, Ord)
+                          cgiVars :: [(String,String)],
+                          cgiInput :: [(String,String)],
+                          cgiResponseHeaders :: [(String,String)]
+                         }
+              deriving (Show, Read, Eq, Ord)
 
 -- | The CGI monad.
 newtype CGI a = CGI { unCGI :: StateT CGIState IO a }
 
 -- | The result of a CGI program.
 data CGIResult = CGIOutput String
-	       | CGIRedirect String
-		 deriving (Show, Read, Eq, Ord)
+               | CGIRedirect String
+                 deriving (Show, Read, Eq, Ord)
 
 --
 -- * CGI monad
@@ -104,34 +104,34 @@ runCGI = hRunCGI stdin stdout
 -- | Run a CGI action. Gets CGI environment variables from 
 --   the program environment.
 hRunCGI :: Handle -- ^ Handle that input will be read from.
-	-> Handle -- ^ Handle that output will be written to.
-	-> CGI CGIResult -> IO ()
+        -> Handle -- ^ Handle that output will be written to.
+        -> CGI CGIResult -> IO ()
 hRunCGI hin hout f = do env <- getCgiVars
-			input <- hGetContents hin
-			output <- runCGIEnv env input f
-			hPutStr hout output
-			hFlush hout
+                        input <- hGetContents hin
+                        output <- runCGIEnv env input f
+                        hPutStr hout output
+                        hFlush hout
 
 -- | Run a CGI action in a given environment, using (lazy) strings 
 --   for input and output. 
 runCGIEnv :: [(String,String)] -- ^ CGI environment variables.
-	  -> String -- ^ Request body.
-	  -> CGI CGIResult -- ^ CGI action.
-	  -> IO String -- ^ Response (headers and content).
+          -> String -- ^ Request body.
+          -> CGI CGIResult -- ^ CGI action.
+          -> IO String -- ^ Response (headers and content).
 runCGIEnv vars input f 
     = do let qs = getQueryString vars input
-	     s = CGIState {
-			   cgiVars = vars,
-			   cgiInput = formDecode qs,
-			   cgiResponseHeaders = initHeaders
-			  }
-	 (output,s') <- runStateT (unCGI f) s
-	 let hs = cgiResponseHeaders s'
-	 return $ case output of
+             s = CGIState {
+                           cgiVars = vars,
+                           cgiInput = formDecode qs,
+                           cgiResponseHeaders = initHeaders
+                          }
+         (output,s') <- runStateT (unCGI f) s
+         let hs = cgiResponseHeaders s'
+         return $ case output of
            CGIOutput str   -> formatResponse str hs'
-	       where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
-	   CGIRedirect url -> formatResponse "" hs'
-	       where hs' = tableSet "Location" url hs
+               where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
+           CGIRedirect url -> formatResponse "" hs'
+               where hs' = tableSet "Location" url hs
 
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
@@ -152,7 +152,7 @@ output str = return $ CGIOutput str
 
 -- | Redirect to some location.
 redirect :: String        -- ^ A URL to redirect to.
-	 -> CGI CGIResult
+         -> CGI CGIResult
 redirect str = return $ CGIRedirect str
 
 --
@@ -179,16 +179,16 @@ getVars = cgiGet cgiVars
 --
 -- > query <- getInput "query"
 getInput :: String             -- ^ The name of the variable.
-	 -> CGI (Maybe String) -- ^ The value of the variable,
+         -> CGI (Maybe String) -- ^ The value of the variable,
                                --   or Nothing, if it was not set.
 getInput name = liftM (lookup name) getInputs
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: Read a => 
-	     String        -- ^ The name of the variable.
-	  -> CGI (Maybe a) -- ^ 'Nothing' if the variable does not exist
-	                   --   or if the value could not be interpreted
-	                   --   as the desired type.
+             String        -- ^ The name of the variable.
+          -> CGI (Maybe a) -- ^ 'Nothing' if the variable does not exist
+                           --   or if the value could not be interpreted
+                           --   as the desired type.
 readInput name = liftM (>>= maybeRead) (getInput name)
 
 -- | Get all input variables and their values.
@@ -201,16 +201,16 @@ getInputs = cgiGet cgiInput
 
 -- | Get the value of a cookie.
 getCookie :: String             -- ^ The name of the cookie.
-	  -> CGI (Maybe String)
+          -> CGI (Maybe String)
 getCookie name = do
-		 cs <- getVar "HTTP_COOKIE"
-		 return $ maybe Nothing (findCookie name) cs
+                 cs <- getVar "HTTP_COOKIE"
+                 return $ maybe Nothing (findCookie name) cs
 
 -- | Set a cookie.
 setCookie :: Cookie -> CGI ()
 setCookie cookie = 
     cgiModify (\s -> s{cgiResponseHeaders 
-		    = Cookie.setCookie cookie (cgiResponseHeaders s)})
+                    = Cookie.setCookie cookie (cgiResponseHeaders s)})
 
 -- | Delete a cookie from the client
 deleteCookie :: Cookie -> CGI ()
@@ -226,11 +226,11 @@ deleteCookie cookie = setCookie (Cookie.deleteCookie cookie)
 --
 -- > setHeader "Content-type" "text/plain"
 setHeader :: String -- ^ Header name.
-	  -> String -- ^ Header value.
-	  -> CGI ()
+          -> String -- ^ Header value.
+          -> CGI ()
 setHeader name value = 
     cgiModify (\s -> s{cgiResponseHeaders 
-		    = tableSet name value (cgiResponseHeaders s)})
+                    = tableSet name value (cgiResponseHeaders s)})
 
 showHeader :: (String,String) -> ShowS
 showHeader (n,v) = showString n . showString ": " . showString v
@@ -247,7 +247,7 @@ formDecode :: String -> [(String,String)]
 formDecode "" = []
 formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
     where (nv,rs) = break (=='&') s
-	  (n,v) = break (=='=') nv
+          (n,v) = break (=='=') nv
 
 -- | Convert a single value from the application\/x-www-form-urlencoded encoding.
 urlDecode :: String -> String
@@ -255,10 +255,10 @@ urlDecode = unEscapeString . replace '+' ' '
 
 -- | Replace all instances of a value in a list by another value.
 replace :: Eq a => 
-	   a   -- ^ Value to look for
-	-> a   -- ^ Value to replace it with
-	-> [a] -- ^ Input list
-	-> [a] -- ^ Output list
+           a   -- ^ Value to look for
+        -> a   -- ^ Value to replace it with
+        -> [a] -- ^ Input list
+        -> [a] -- ^ Output list
 replace x y = map (\z -> if z == x then y else z)
 
 -- | Set a value in a lookup table.
@@ -341,17 +341,17 @@ cgiVarNames =
 -- | Returns the query string, or the empty string if there is 
 --   an error.
 getQueryString :: [(String,String)] -- ^ CGI environment variables.
-	       -> String            -- ^ Request body.
-	       -> String            -- ^ Query string.
+               -> String            -- ^ Request body.
+               -> String            -- ^ Query string.
 getQueryString env req =
    case lookup "REQUEST_METHOD" env of
       Just "POST" -> 
         let len = lookup "CONTENT_LENGTH" env >>= maybeRead
          in case len of
-   	   -- FIXME: we should check that length req == len,
-	   -- but that would force evaluation of req
+              -- FIXME: we should check that length req == len,
+           -- but that would force evaluation of req
            Just l  -> take l req
-	   Nothing -> ""
+           Nothing -> ""
       _ -> lookupOrNil "QUERY_STRING" env
 
 myGetEnv :: String -> IO String
@@ -376,10 +376,10 @@ wrapper f = runCGI (wrapCGI f)
 --   Runs a simple CGI server.
 --   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 pwrapper :: PortID  -- ^ The port to run the server on.
-	 -> ([(String,String)] -> IO Html) 
-	 -> IO ()
+         -> ([(String,String)] -> IO Html) 
+         -> IO ()
 pwrapper pid f = do sock <- listenOn pid
-		    acceptConnections fn sock
+                    acceptConnections fn sock
  where fn h = hRunCGI h h (wrapCGI f)
 
 acceptConnections fn sock = do
@@ -387,19 +387,19 @@ acceptConnections fn sock = do
   forkIO (fn h `finally` (hClose h))
   acceptConnections fn sock
 
-accept' :: Socket 		-- Listening Socket
-       -> IO (Handle,SockAddr)	-- StdIO Handle for read/write
+accept' :: Socket                 -- Listening Socket
+       -> IO (Handle,SockAddr)        -- StdIO Handle for read/write
 accept' sock = do
  (sock', addr) <- Socket.accept sock
- handle	<- socketToHandle sock' ReadWriteMode
+ handle        <- socketToHandle sock' ReadWriteMode
  return (handle,addr)
 
 wrapCGI :: ([(String,String)] -> IO Html) -> CGI CGIResult
 wrapCGI f = do
-	    vs <- getVars
-	    is <- getInputs
-	    html <- io (f (vs++is))
-	    output (renderHtml html)
+            vs <- getVars
+            is <- getInputs
+            html <- io (f (vs++is))
+            output (renderHtml html)
 
 -- | Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 connectToCGIScript :: String -> PortID -> IO ()
@@ -410,16 +410,16 @@ connectToCGIScript host portId
           h <- connectTo host portId
                  `Exception.catch`
                    (\ e -> abort "Cannot connect to CGI daemon." e)
-	  hPutStrLn h str
-	  (sendBack h `finally` hClose h)
+          hPutStrLn h str
+          (sendBack h `finally` hClose h)
                `Prelude.catch` (\e -> unless (isEOFError e) (ioError e))
 
 abort :: String -> Exception -> IO a
 abort msg e = 
     do putStrLn ("Content-type: text/html\n\n" ++
-		   "<html><body>" ++ msg ++ "</body></html>")
+                   "<html><body>" ++ msg ++ "</body></html>")
        throw e
 
 sendBack h = do s <- hGetLine h
                 putStrLn s
-		sendBack h
+                sendBack h
