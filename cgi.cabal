@@ -11,7 +11,7 @@ Synopsis: Library for writing CGI programs.
 Exposed-Modules: 
    Network.NewCGI,
    Network.HTTP.Cookie                   
-ghc-options: -O2
+ghc-options: -O2 -Wall
 
 
 Executable:     printinput
