@@ -1,9 +1,10 @@
 Name: cgi
 Version: 0.1
-Copyright: Bjorn Bringert, Erik Meijer, Sven Panne, Andy Gill
+Copyright: Bjorn Bringert, Andy Gill, Ian Lynagh, Erik Meijer, Sven Panne
 Maintainer: libraries@haskell.org
 Author: Bjorn Bringert
 License: BSD3
+License-file: LICENSE
 build-depends: haskell98, base, network, parsec, mtl
 Extensions: 
 Synopsis: Library for writing CGI programs.

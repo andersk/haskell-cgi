@@ -3,7 +3,8 @@
 -- Module      :  Network.CGI
 -- Copyright   :  (c) The University of Glasgow 2001
 --                (c) Bjorn Bringert 2004-2005
--- License     :  BSD-style (see the file libraries/network/LICENSE)
+--                (c) Ian Lynagh 2005
+-- License     :  BSD-style
 --
 -- Maintainer  :  bjorn@bringert.net
 -- Stability   :  experimental

@@ -1,8 +1,9 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.HTTP.Cookie
--- Copyright   :  (c) Bjorn Bringert, 2004
--- License     :  BSD-style (see the file libraries/base/LICENSE)
+-- Copyright   :  (c) Bjorn Bringert 2004-2005
+--                (c) Ian Lynagh 2005
+-- License     :  BSD-style
 --
 -- Maintainer  :  Bjorn Bringert <bjorn@bringert.net>
 -- Stability   :  experimental
