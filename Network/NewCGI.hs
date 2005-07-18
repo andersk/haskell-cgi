@@ -22,7 +22,7 @@
 
 module Network.NewCGI (
   -- * The CGI monad
-    CGI, CGIResult
+    MonadCGI, CGIT, CGIResult, CGI
   , io
   , runCGI, hRunCGI, runCGIEnv
   -- * Output
@@ -40,6 +40,7 @@ module Network.NewCGI (
 
 import Control.Monad (liftM, unless)
 import Control.Monad.State (StateT, gets, lift, modify, runStateT)
+import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
 import Data.List (intersperse)
 import Data.Maybe (listToMaybe, fromMaybe)
 import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
@@ -66,8 +67,11 @@ data CGIState = CGIState {
                          }
               deriving (Show, Read, Eq, Ord)
 
--- | The CGI monad.
-newtype CGI a = CGI { unCGI :: StateT CGIState IO a }
+-- | The CGIT monad transformer.
+newtype CGIT m a = CGIT { unCGIT :: StateT CGIState m a }
+
+-- | A simple CGI monad with just IO.
+type CGI a = CGIT IO a
 
 -- | The result of a CGI program.
 data CGIResult = CGIOutput String
@@ -75,50 +79,69 @@ data CGIResult = CGIOutput String
                  deriving (Show, Read, Eq, Ord)
 
 --
--- * CGI monad
+-- * CGIT monad transformer
 --
 
-instance Monad CGI where
-    c >>= f = CGI (unCGI c >>= unCGI . f)
-    return = CGI . return
+instance Monad m => Monad (CGIT m) where
+    c >>= f = CGIT (unCGIT c >>= unCGIT . f)
+    return = CGIT . return
     -- FIXME: should we have an error monad instead?
-    fail s = io (fail s)
+    fail s = CGIT (fail s)
+
+instance MonadIO m => MonadIO (CGIT m) where
+    liftIO f = CGIT (liftIO f)
+
+class Monad m => MonadCGI m where
+    -- | Modify the CGIT state.
+    cgiModify :: (CGIState -> CGIState) -> m ()
+    -- | Get something from the CGIT state.
+    cgiGet :: (CGIState -> a) -> m a
+
+instance Monad m => MonadCGI (CGIT m) where
+    cgiModify = CGIT . modify
+    cgiGet = CGIT . gets
+
+{-
+-- requires -fallow-undecidable-instances
+instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
+    cgiModify f = lift (cgiModify f)
+    cgiGet f = lift (cgiGet f)
+-}
+
+instance MonadTrans CGIT where
+    lift m = CGIT (lift m)
+
 
 -- | Perform an IO action in the CGI monad.
-io :: IO a -> CGI a
-io = CGI . lift
-
--- | Get something from the CGI state.
-cgiGet :: (CGIState -> a) -> CGI a
-cgiGet = CGI . gets
-
--- | Modify the CGI state.
-cgiModify :: (CGIState -> CGIState) -> CGI ()
-cgiModify = CGI . modify
+--   This is just 'liftIO' specilized to the CGIT monad.
+io :: MonadIO m => IO a -> CGIT m a
+io = liftIO
 
 -- | Run a CGI action. Typically called by the main function.
 --   Reads input from stdin and writes to stdout. Gets
 --   CGI environment variables from the program environment.
-runCGI :: CGI CGIResult -> IO ()
+runCGI :: MonadIO m => CGIT m CGIResult -> m ()
 runCGI = hRunCGI stdin stdout
 
 -- | Run a CGI action. Gets CGI environment variables from
 --   the program environment.
-hRunCGI :: Handle -- ^ Handle that input will be read from.
+hRunCGI :: MonadIO m =>
+	   Handle -- ^ Handle that input will be read from.
         -> Handle -- ^ Handle that output will be written to.
-        -> CGI CGIResult -> IO ()
-hRunCGI hin hout f = do env <- getCgiVars
-                        inp <- hGetContents hin
+        -> CGIT m CGIResult -> m ()
+hRunCGI hin hout f = do env <- liftIO getCgiVars
+                        inp <- liftIO $ hGetContents hin
                         outp <- runCGIEnv env inp f
-                        hPutStr hout outp
-                        hFlush hout
+                        liftIO $ hPutStr hout outp
+                        liftIO $ hFlush hout
 
 -- | Run a CGI action in a given environment, using (lazy) strings
 --   for input and output.
-runCGIEnv :: [(String,String)] -- ^ CGI environment variables.
+runCGIEnv :: Monad m =>
+	     [(String,String)] -- ^ CGI environment variables.
           -> String -- ^ Request body.
-          -> CGI CGIResult -- ^ CGI action.
-          -> IO String -- ^ Response (headers and content).
+          -> CGIT m CGIResult -- ^ CGI action.
+          -> m String -- ^ Response (headers and content).
 runCGIEnv vars inp f
     = do let qs = getQueryString vars inp
              s = CGIState {
@@ -126,7 +149,7 @@ runCGIEnv vars inp f
                            cgiInput = formDecode qs,
                            cgiResponseHeaders = initHeaders
                           }
-         (outp,s') <- runStateT (unCGI f) s
+         (outp,s') <- runStateT (unCGIT f) s
          let hs = cgiResponseHeaders s'
          return $ case outp of
            CGIOutput str   -> formatResponse str hs'
@@ -147,13 +170,15 @@ formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
 -- | Output a string. The output is assumed to be text\/html, encoded using
 --   ISO-8859-1. To change this, set the Content-type header using
 --   'setHeader'.
-output :: String        -- ^ The string to output.
-       -> CGI CGIResult
+output :: MonadCGI m =>
+	  String        -- ^ The string to output.
+       -> m CGIResult
 output str = return $ CGIOutput str
 
 -- | Redirect to some location.
-redirect :: String        -- ^ A URL to redirect to.
-         -> CGI CGIResult
+redirect :: MonadCGI m =>
+	    String        -- ^ A URL to redirect to.
+         -> m CGIResult
 redirect str = return $ CGIRedirect str
 
 --
@@ -163,12 +188,14 @@ redirect str = return $ CGIRedirect str
 -- | Get the value of a CGI environment variable. Example:
 --
 -- > remoteAddr <- getVar "REMOTE_ADDR"
-getVar :: String             -- ^ The name of the variable.
-       -> CGI (Maybe String)
+getVar :: MonadCGI m =>
+	  String             -- ^ The name of the variable.
+       -> m (Maybe String)
 getVar name = liftM (lookup name) getVars
 
 -- | Get all CGI environment variables and their values.
-getVars :: CGI [(String,String)]
+getVars :: MonadCGI m =>
+	   m [(String,String)]
 getVars = cgiGet cgiVars
 
 --
@@ -179,21 +206,23 @@ getVars = cgiGet cgiVars
 --   Example:
 --
 -- > query <- getInput "query"
-getInput :: String             -- ^ The name of the variable.
-         -> CGI (Maybe String) -- ^ The value of the variable,
+getInput :: MonadCGI m =>
+	    String             -- ^ The name of the variable.
+         -> m (Maybe String) -- ^ The value of the variable,
                                --   or Nothing, if it was not set.
 getInput name = liftM (lookup name) getInputs
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
-readInput :: Read a =>
+readInput :: (Read a, MonadCGI m) =>
              String        -- ^ The name of the variable.
-          -> CGI (Maybe a) -- ^ 'Nothing' if the variable does not exist
+          -> m (Maybe a) -- ^ 'Nothing' if the variable does not exist
                            --   or if the value could not be interpreted
                            --   as the desired type.
 readInput name = liftM (>>= maybeRead) (getInput name)
 
 -- | Get all input variables and their values.
-getInputs :: CGI [(String,String)]
+getInputs :: MonadCGI m =>
+	     m [(String,String)]
 getInputs = cgiGet cgiInput
 
 --
@@ -201,20 +230,25 @@ getInputs = cgiGet cgiInput
 --
 
 -- | Get the value of a cookie.
-getCookie :: String             -- ^ The name of the cookie.
-          -> CGI (Maybe String)
+getCookie :: MonadCGI m =>
+	     String             -- ^ The name of the cookie.
+          -> m (Maybe String)
 getCookie name = do
                  cs <- getVar "HTTP_COOKIE"
                  return $ maybe Nothing (findCookie name) cs
 
 -- | Set a cookie.
-setCookie :: Cookie -> CGI ()
+setCookie :: MonadCGI m => 
+	     Cookie 
+	  -> m ()
 setCookie cookie =
     cgiModify (\s -> s{cgiResponseHeaders
                     = Cookie.setCookie cookie (cgiResponseHeaders s)})
 
 -- | Delete a cookie from the client
-deleteCookie :: Cookie -> CGI ()
+deleteCookie :: MonadCGI m =>
+		Cookie 
+	     -> m ()
 deleteCookie cookie = setCookie (Cookie.deleteCookie cookie)
 
 
@@ -226,9 +260,10 @@ deleteCookie cookie = setCookie (Cookie.deleteCookie cookie)
 --   Example:
 --
 -- > setHeader "Content-type" "text/plain"
-setHeader :: String -- ^ Header name.
+setHeader :: MonadCGI m =>
+	     String -- ^ Header name.
           -> String -- ^ Header value.
-          -> CGI ()
+          -> m ()
 setHeader name value =
     cgiModify (\s -> s{cgiResponseHeaders
                     = tableSet name value (cgiResponseHeaders s)})
@@ -390,11 +425,11 @@ accept' sock = do
  handle        <- socketToHandle sock' ReadWriteMode
  return (handle,addr)
 
-wrapCGI :: ([(String,String)] -> IO Html) -> CGI CGIResult
+wrapCGI :: MonadIO m => ([(String,String)] -> IO Html) -> CGIT m CGIResult
 wrapCGI f = do
             vs <- getVars
             is <- getInputs
-            html <- io (f (vs++is))
+            html <- liftIO (f (vs++is))
             output (renderHtml html)
 
 -- | Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
