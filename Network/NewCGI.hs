@@ -399,7 +399,7 @@ lookupOrNil n = fromMaybe "" . lookup n
 --   Output the output from a function from CGI environment and
 --   input variables to an HTML document.
 wrapper :: ([(String,String)] -> IO Html) -> IO ()
-wrapper = runCGI . wrapCGI f
+wrapper = runCGI . wrapCGI
 
 -- | Compatibility wrapper for the old CGI interface.
 --   Runs a simple CGI server.
