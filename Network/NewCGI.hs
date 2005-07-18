@@ -102,7 +102,7 @@ instance Monad m => MonadCGI (CGIT m) where
     cgiGet = CGIT . gets
 
 {-
--- requires -fallow-undecidable-instances
+-- requires -fallow-undecidable-instances and -fallow-overlapping-instances
 instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
     cgiModify f = lift (cgiModify f)
     cgiGet f = lift (cgiGet f)
