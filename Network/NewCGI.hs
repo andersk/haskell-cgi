@@ -56,7 +56,7 @@ import Control.Exception as Exception (Exception,throw,catch,finally)
 import Network (PortID, Socket, listenOn, connectTo)
 import Network.Socket as Socket (SockAddr(SockAddrInet), accept, socketToHandle)
 import System.IO (hGetLine, hClose, IOMode(ReadWriteMode))
-import System.IO.Error (catch, isEOFError)
+import System.IO.Error (isEOFError)
 import Text.Html (Html, renderHtml)
 
 
