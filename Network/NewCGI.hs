@@ -109,7 +109,7 @@ instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
 -}
 
 instance MonadTrans CGIT where
-    lift m = CGIT (lift m)
+    lift = CGIT . lift
 
 
 -- | Perform an IO action in the CGI monad.
@@ -173,13 +173,13 @@ formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
 output :: MonadCGI m =>
 	  String        -- ^ The string to output.
        -> m CGIResult
-output str = return $ CGIOutput str
+output = return . CGIOutput
 
 -- | Redirect to some location.
 redirect :: MonadCGI m =>
 	    String        -- ^ A URL to redirect to.
          -> m CGIResult
-redirect str = return $ CGIRedirect str
+redirect = return . CGIRedirect
 
 --
 -- * HTTP variables
@@ -210,7 +210,7 @@ getInput :: MonadCGI m =>
 	    String             -- ^ The name of the variable.
          -> m (Maybe String) -- ^ The value of the variable,
                                --   or Nothing, if it was not set.
-getInput name = liftM (lookup name) getInputs
+getInput name = lookup name `liftM` getInputs
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: (Read a, MonadCGI m) =>
@@ -218,7 +218,7 @@ readInput :: (Read a, MonadCGI m) =>
           -> m (Maybe a) -- ^ 'Nothing' if the variable does not exist
                            --   or if the value could not be interpreted
                            --   as the desired type.
-readInput name = liftM (>>= maybeRead) (getInput name)
+readInput name = maybeRead `inside` getInput name
 
 -- | Get all input variables and their values.
 getInputs :: MonadCGI m =>
@@ -233,28 +233,27 @@ getInputs = cgiGet cgiInput
 getCookie :: MonadCGI m =>
 	     String             -- ^ The name of the cookie.
           -> m (Maybe String)
-getCookie name = do
-                 cs <- getVar "HTTP_COOKIE"
-                 return $ maybe Nothing (findCookie name) cs
+getCookie name = findCookie name `inside` getVar "HTTP_COOKIE"
 
 -- | Set a cookie.
-setCookie :: MonadCGI m => 
-	     Cookie 
-	  -> m ()
-setCookie cookie =
-    cgiModify (\s -> s{cgiResponseHeaders
-                    = Cookie.setCookie cookie (cgiResponseHeaders s)})
+setCookie :: MonadCGI m => Cookie -> m ()
+setCookie = modifyHeaders . Cookie.setCookie
 
 -- | Delete a cookie from the client
-deleteCookie :: MonadCGI m =>
-		Cookie 
-	     -> m ()
-deleteCookie cookie = setCookie (Cookie.deleteCookie cookie)
+deleteCookie :: MonadCGI m => Cookie -> m ()
+deleteCookie = setCookie . Cookie.deleteCookie
 
 
 --
 -- * Headers
 --
+
+-- | Modify the response headers.
+modifyHeaders :: MonadCGI m =>
+		 ([(String,String)] -> [(String,String)])
+	      -> m ()
+modifyHeaders f = cgiModify (\s -> s{cgiResponseHeaders 
+				     = f (cgiResponseHeaders s)})
 
 -- | Set a response header.
 --   Example:
@@ -264,9 +263,7 @@ setHeader :: MonadCGI m =>
 	     String -- ^ Header name.
           -> String -- ^ Header value.
           -> m ()
-setHeader name value =
-    cgiModify (\s -> s{cgiResponseHeaders
-                    = tableSet name value (cgiResponseHeaders s)})
+setHeader name value = modifyHeaders (tableSet name value)
 
 showHeader :: (String,String) -> ShowS
 showHeader (n,v) = showString n . showString ": " . showString v
@@ -325,13 +322,15 @@ join glue = concatS . intersperse (showString glue)
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . reads
 
+inside :: (Monad m, Monad n) => (a -> n b) -> m (n a) -> m (n b)
+inside = liftM . (=<<)
+
 --
 -- * CGI protocol stuff
 --
 
 getCgiVars :: IO [(String,String)]
-getCgiVars = do vals <- mapM myGetEnv cgiVarNames
-                return (zip cgiVarNames vals)
+getCgiVars = mapM (\n -> (,) n `liftM` getEnvOrNil n) cgiVarNames
 
 cgiVarNames :: [String]
 cgiVarNames =
@@ -384,8 +383,8 @@ getQueryString env req =
            Nothing -> ""
       _ -> lookupOrNil "QUERY_STRING" env
 
-myGetEnv :: String -> IO String
-myGetEnv v = Prelude.catch (getEnv v) (const (return ""))
+getEnvOrNil :: String -> IO String
+getEnvOrNil v = getEnv v `Prelude.catch` const (return "")
 
 lookupOrNil :: String -> [(String,String)] -> String
 lookupOrNil n = fromMaybe "" . lookup n
@@ -400,7 +399,7 @@ lookupOrNil n = fromMaybe "" . lookup n
 --   Output the output from a function from CGI environment and
 --   input variables to an HTML document.
 wrapper :: ([(String,String)] -> IO Html) -> IO ()
-wrapper f = runCGI (wrapCGI f)
+wrapper = runCGI . wrapCGI f
 
 -- | Compatibility wrapper for the old CGI interface.
 --   Runs a simple CGI server.
