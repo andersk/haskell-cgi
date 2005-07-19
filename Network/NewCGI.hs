@@ -121,7 +121,7 @@ runCGI = hRunCGI stdin stdout
 -- | Run a CGI action. Gets CGI environment variables from
 --   the program environment.
 hRunCGI :: MonadIO m =>
-	   Handle -- ^ Handle that input will be read from.
+           Handle -- ^ Handle that input will be read from.
         -> Handle -- ^ Handle that output will be written to.
         -> CGIT m CGIResult -> m ()
 hRunCGI hin hout f = do env <- liftIO getCgiVars
@@ -133,7 +133,7 @@ hRunCGI hin hout f = do env <- liftIO getCgiVars
 -- | Run a CGI action in a given environment, using (lazy) strings
 --   for input and output.
 runCGIEnv :: Monad m =>
-	     [(String,String)] -- ^ CGI environment variables.
+             [(String,String)] -- ^ CGI environment variables.
           -> String -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
           -> m String -- ^ Response (headers and content).
@@ -166,13 +166,13 @@ formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
 --   ISO-8859-1. To change this, set the Content-type header using
 --   'setHeader'.
 output :: MonadCGI m =>
-	  String        -- ^ The string to output.
+          String        -- ^ The string to output.
        -> m CGIResult
 output = return . CGIOutput
 
 -- | Redirect to some location.
 redirect :: MonadCGI m =>
-	    String        -- ^ A URL to redirect to.
+            String        -- ^ A URL to redirect to.
          -> m CGIResult
 redirect = return . CGIRedirect
 
@@ -184,13 +184,13 @@ redirect = return . CGIRedirect
 --
 -- > remoteAddr <- getVar "REMOTE_ADDR"
 getVar :: MonadCGI m =>
-	  String             -- ^ The name of the variable.
+          String             -- ^ The name of the variable.
        -> m (Maybe String)
 getVar name = liftM (lookup name) getVars
 
 -- | Get all CGI environment variables and their values.
 getVars :: MonadCGI m =>
-	   m [(String,String)]
+           m [(String,String)]
 getVars = cgiGet cgiVars
 
 --
@@ -202,7 +202,7 @@ getVars = cgiGet cgiVars
 --
 -- > query <- getInput "query"
 getInput :: MonadCGI m =>
-	    String             -- ^ The name of the variable.
+            String             -- ^ The name of the variable.
          -> m (Maybe String) -- ^ The value of the variable,
                                --   or Nothing, if it was not set.
 getInput name = lookup name `liftM` getInputs
@@ -217,7 +217,7 @@ readInput name = maybeRead `inside` getInput name
 
 -- | Get all input variables and their values.
 getInputs :: MonadCGI m =>
-	     m [(String,String)]
+             m [(String,String)]
 getInputs = cgiGet cgiInput
 
 --
@@ -226,7 +226,7 @@ getInputs = cgiGet cgiInput
 
 -- | Get the value of a cookie.
 getCookie :: MonadCGI m =>
-	     String             -- ^ The name of the cookie.
+             String             -- ^ The name of the cookie.
           -> m (Maybe String)
 getCookie name = findCookie name `inside` getVar "HTTP_COOKIE"
 
@@ -245,17 +245,17 @@ deleteCookie = setCookie . Cookie.deleteCookie
 
 -- | Modify the response headers.
 modifyHeaders :: MonadCGI m =>
-		 ([(String,String)] -> [(String,String)])
-	      -> m ()
+                 ([(String,String)] -> [(String,String)])
+              -> m ()
 modifyHeaders f = cgiModify (\s -> s{cgiResponseHeaders 
-				     = f (cgiResponseHeaders s)})
+                                     = f (cgiResponseHeaders s)})
 
 -- | Set a response header.
 --   Example:
 --
 -- > setHeader "Content-type" "text/plain"
 setHeader :: MonadCGI m =>
-	     String -- ^ Header name.
+             String -- ^ Header name.
           -> String -- ^ Header value.
           -> m ()
 setHeader name value = modifyHeaders (tableSet name value)
