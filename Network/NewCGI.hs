@@ -138,10 +138,9 @@ runCGIEnv :: Monad m =>
           -> CGIT m CGIResult -- ^ CGI action.
           -> m String -- ^ Response (headers and content).
 runCGIEnv vars inp f
-    = do let qs = getQueryString vars inp
-             s = CGIState {
+    = do let s = CGIState {
                            cgiVars = vars,
-                           cgiInput = formDecode qs,
+                           cgiInput = decodeInput vars inp,
                            cgiResponseHeaders = initHeaders
                           }
          (outp,s') <- runStateT (unCGIT f) s
@@ -270,17 +269,6 @@ initHeaders = []
 -- * Utilities
 --
 
--- | Get the name-value pairs from application\/x-www-form-urlencoded data.
-formDecode :: String -> [(String,String)]
-formDecode "" = []
-formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
-    where (nv,rs) = break (=='&') s
-          (n,v) = break (=='=') nv
-
--- | Convert a single value from the application\/x-www-form-urlencoded encoding.
-urlDecode :: String -> String
-urlDecode = unEscapeString . replace '+' ' '
-
 -- | Replace all instances of a value in a list by another value.
 replace :: Eq a =>
            a   -- ^ Value to look for
@@ -362,21 +350,55 @@ cgiVarNames =
    , "HTTP_USER_AGENT"
    ]
 
--- | Returns the query string, or the empty string if there is
---   an error.
-getQueryString :: [(String,String)] -- ^ CGI environment variables.
-               -> String            -- ^ Request body.
-               -> String            -- ^ Query string.
-getQueryString env req =
+-- | Get and decode the input according to the request
+--   method and the content-type.
+decodeInput :: [(String,String)] -- ^ CGI environment variables.
+            -> String            -- ^ Request body.
+            -> [(String,String)] -- ^ Input variables and values.
+decodeInput env inp = 
+   let inp' = getRequestInput env inp
+     in case lookup "CONTENT_TYPE" env of
+            Just "application/x-www-form-urlencoded" -> formDecode inp'
+            Just x -> [(x,inp)] -- FIXME: report that we don't handle this content-type
+            -- No content-type given, assume x-www-form-urlencoded
+            Nothing -> formDecode inp'
+
+-- | Returns the query string, or the request body if it is
+--   a POST request, or the empty string if there is an error.
+getRequestInput :: [(String,String)] -- ^ CGI environment variables.
+                -> String            -- ^ Request body.
+                -> String            -- ^ Query string.
+getRequestInput env req =
    case lookup "REQUEST_METHOD" env of
-      Just "POST" ->
-        let len = lookup "CONTENT_LENGTH" env >>= maybeRead
-         in case len of
-              -- FIXME: we should check that length req == len,
+      Just "POST" -> takeInput env req
+      _ -> lookupOrNil "QUERY_STRING" env
+
+-- | Take the right number of bytes from the input.
+takeInput :: [(String,String)]  -- ^ CGI environment variables.
+          -> String             -- ^ Request body.
+          -> String             -- ^ CONTENT_LENGTH bytes from the request body,
+                                --   or the empty string if there is no
+                                --   CONTENT_LENGTH.
+takeInput env req = 
+    case len of
+           -- FIXME: we should check that length req == len,
            -- but that would force evaluation of req
            Just l  -> take l req
            Nothing -> ""
-      _ -> lookupOrNil "QUERY_STRING" env
+     where len = lookup "CONTENT_LENGTH" env >>= maybeRead
+
+-- | Get the name-value pairs from application\/x-www-form-urlencoded data.
+formDecode :: String -> [(String,String)]
+formDecode "" = []
+formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
+    where (nv,rs) = break (=='&') s
+          (n,v) = break (=='=') nv
+
+-- | Convert a single value from the application\/x-www-form-urlencoded encoding.
+urlDecode :: String -> String
+urlDecode = unEscapeString . replace '+' ' '
+
+
 
 getEnvOrNil :: String -> IO String
 getEnvOrNil v = getEnv v `Prelude.catch` const (return "")
@@ -431,7 +453,7 @@ connectToCGIScript :: String -> PortID -> IO ()
 connectToCGIScript host portId
      = do env <- getCgiVars
           input <- getContents
-          let str = getQueryString env input
+          let str = getRequestInput env input
           h <- connectTo host portId
                  `Exception.catch`
                    (\ e -> abort "Cannot connect to CGI daemon." e)
