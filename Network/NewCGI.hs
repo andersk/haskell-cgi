@@ -23,7 +23,7 @@
 module Network.NewCGI (
   -- * The CGI monad
     MonadCGI, CGIT, CGIResult, CGI
-  , io
+  , liftIO
   , runCGI, hRunCGI, runCGIEnv
   -- * Output
   , output, redirect
@@ -111,11 +111,6 @@ instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
 instance MonadTrans CGIT where
     lift = CGIT . lift
 
-
--- | Perform an IO action in the CGI monad.
---   This is just 'liftIO' specilized to the CGIT monad.
-io :: MonadIO m => IO a -> CGIT m a
-io = liftIO
 
 -- | Run a CGI action. Typically called by the main function.
 --   Reads input from stdin and writes to stdout. Gets
