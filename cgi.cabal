@@ -21,3 +21,7 @@ Hs-Source-Dir:  examples
 Executable:     redirect
 Main-Is:        redirect.hs
 Hs-Source-Dir:  examples
+
+Executable:     upload
+Main-Is:        upload.hs
+Hs-Source-Dir:  examples
