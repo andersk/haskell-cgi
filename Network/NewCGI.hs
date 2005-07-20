@@ -29,7 +29,8 @@ module Network.NewCGI (
   , output, redirect
   , setHeader
   -- * Input
-  , getInput, readInput, getInputs
+  , getInput, readInput, getInputNames
+  , getInputFilename
   , getVar, getVars
   -- * Cookies
   , Cookie(..), newCookie
@@ -64,9 +65,16 @@ import Text.Html (Html, renderHtml)
 
 data CGIState = CGIState {
                           cgiVars :: [(String,String)],
-                          cgiInput :: [(String,String)],
+                          cgiInput :: [(String,Input)],
                           cgiResponseHeaders :: [(String,String)]
                          }
+              deriving (Show, Read, Eq, Ord)
+
+data Input = Input {
+                    value :: String,
+                    filename :: Maybe String,
+                    contentType :: ContentType
+                   }
               deriving (Show, Read, Eq, Ord)
 
 -- | The CGIT monad transformer.
@@ -198,15 +206,25 @@ getVars = cgiGet cgiVars
 -- * Query input
 --
 
--- | Get an input variable, for example from a form.
+-- | Get the value of an input variable, for example from a form.
 --   Example:
 --
 -- > query <- getInput "query"
 getInput :: MonadCGI m =>
-            String             -- ^ The name of the variable.
+            String           -- ^ The name of the variable.
          -> m (Maybe String) -- ^ The value of the variable,
-                               --   or Nothing, if it was not set.
-getInput name = lookup name `liftM` getInputs
+                             --   or Nothing, if it was not set.
+getInput n = lift2M value (getInput_ n)
+
+-- | Get the file name of an input.
+getInputFilename :: MonadCGI m =>
+                    String           -- ^ The name of the variable.
+                 -> m (Maybe String) -- ^ The file name corresponding to the
+                                     -- input, if there is one.
+getInputFilename n = inside filename (getInput_ n)
+
+getInput_ ::  MonadCGI m => String -> m (Maybe Input)
+getInput_ n = lookup n `liftM` cgiGet cgiInput
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: (Read a, MonadCGI m) =>
@@ -216,10 +234,9 @@ readInput :: (Read a, MonadCGI m) =>
                            --   as the desired type.
 readInput name = maybeRead `inside` getInput name
 
--- | Get all input variables and their values.
-getInputs :: MonadCGI m =>
-             m [(String,String)]
-getInputs = cgiGet cgiInput
+-- | Get the names of all input variables.
+getInputNames :: MonadCGI m => m [String]
+getInputNames = map fst `liftM` cgiGet cgiInput
 
 --
 -- * Cookies
@@ -259,7 +276,7 @@ setHeader :: MonadCGI m =>
              String -- ^ Header name.
           -> String -- ^ Header value.
           -> m ()
-setHeader name value = modifyHeaders (tableSet name value)
+setHeader n v = modifyHeaders (tableSet n v)
 
 showHeader :: (String,String) -> ShowS
 showHeader (n,v) = showString n . showString ": " . showString v
@@ -310,6 +327,21 @@ maybeRead = fmap fst . listToMaybe . reads
 inside :: (Monad m, Monad n) => (a -> n b) -> m (n a) -> m (n b)
 inside = liftM . (=<<)
 
+lift2M :: (Monad m, Monad n) => (a -> b) -> m (n a) -> m (n b)
+lift2M = liftM . liftM 
+
+-- | Get the value of an environment variable, or
+--   the empty string of the variable is not set.
+getEnvOrNil :: String -> IO String
+getEnvOrNil v = getEnv v `Prelude.catch` const (return "")
+
+-- | Same as 'lookup' specialized to strings, but 
+--   returns the empty string if lookup fails.
+lookupOrNil :: String -> [(String,String)] -> String
+lookupOrNil n = fromMaybe "" . lookup n
+
+
+
 --
 -- * CGI protocol stuff
 --
@@ -356,44 +388,51 @@ cgiVarNames =
 --   method and the content-type.
 decodeInput :: [(String,String)] -- ^ CGI environment variables.
             -> String            -- ^ Request body.
-            -> [(String,String)] -- ^ Input variables and values.
+            -> [(String,Input)] -- ^ Input variables and values.
 decodeInput env inp = 
    let inp' = getRequestInput env inp
-     in case getContentType env of
+       ctype = lookup "CONTENT_TYPE" env 
+                     >>= parseMaybe p_content_type "Content-type"
+     in case ctype of
             Just (ContentType "application" "x-www-form-urlencoded" _) 
-                -> formDecode inp'
+                -> formDecode' inp'
             Just (ContentType "multipart" "form-data" ps) 
                 -> multipartDecode ps inp'
-            Just x -> [] -- FIXME: report that we don't handle this content type
+            Just _ -> [] -- FIXME: report that we don't handle this content type
             -- No content-type given, assume x-www-form-urlencoded
-            Nothing -> formDecode inp'
+            Nothing -> formDecode' inp'
+    where formDecode' i = [ (n, simpleInput v) | (n,v) <- formDecode i]
 
-getContentType :: [(String,String)] -> Maybe ContentType
-getContentType env = lookup "CONTENT_TYPE" env 
-                     >>= parseMaybe p_content_type "Content-type"
+simpleInput :: String -> Input
+simpleInput v = Input { value = v,
+                        filename = Nothing,
+                        contentType = defaultInputType }
+
+defaultInputType :: ContentType
+defaultInputType = ContentType "text" "plain" [] -- FIXME: use some default encoding?
+
 
 -- | Decode multipart\/form-data input.
 multipartDecode :: [(String,String)] -- ^ Content-type parameters
                 -> String            -- ^ Request body
-                -> [(String,String)] -- ^ Input variables and values.
+                -> [(String,Input)] -- ^ Input variables and values.
 multipartDecode ps inp =
     case lookup "boundary" ps of
          Just b -> case parseMaybe (p_multipart_body b) "<request body>" inp of
-                        Just (MultiPart bs) -> map bodyPartToVar bs
+                        Just (MultiPart bs) -> map bodyPartToInput bs
                         Nothing -> [] -- FIXME: report parse error
          Nothing -> [] -- FIXME: report that there was no boundary
 
--- FIXME: this should return a more structured type
-bodyPartToVar :: BodyPart -> (String,String)
-bodyPartToVar (BodyPart hs b) = 
-    case disp of
+bodyPartToInput :: BodyPart -> (String,Input)
+bodyPartToInput (BodyPart hs b) = 
+    case getContentDisposition hs of
               Just (ContentDisposition "form-data" ps) -> 
-                  (fromMaybe "" name, b) -- FIXME: get filename, encoding etc.
-                  where name = lookup "name" ps
-              _ -> ("ERROR","ERROR") -- FIXME: report error
-        where disp = lookup "content-disposition" hs
-                     >>= parseMaybe p_content_disposition "Content-disposition"
-
+                  (lookupOrNil "name" ps,
+                   Input { value = b,
+                           filename = lookup "filename" ps,
+                           contentType = ctype })
+              _ -> ("ERROR",simpleInput "ERROR") -- FIXME: report error
+    where ctype = fromMaybe defaultInputType (getContentType hs)
 
 -- | Returns the query string, or the request body if it is
 --   a POST request, or the empty string if there is an error.
@@ -432,11 +471,6 @@ urlDecode = unEscapeString . replace '+' ' '
 
 
 
-getEnvOrNil :: String -> IO String
-getEnvOrNil v = getEnv v `Prelude.catch` const (return "")
-
-lookupOrNil :: String -> [(String,String)] -> String
-lookupOrNil n = fromMaybe "" . lookup n
 
 --
 -- * Compatibility functions
@@ -476,7 +510,7 @@ accept' sock = do
 wrapCGI :: MonadIO m => ([(String,String)] -> IO Html) -> CGIT m CGIResult
 wrapCGI f = do
             vs <- getVars
-            is <- getInputs
+            is <- map (\(n,v) -> (n, value v)) `liftM` cgiGet cgiInput
             html <- liftIO (f (vs++is))
             output (renderHtml html)
 

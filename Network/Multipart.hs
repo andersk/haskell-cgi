@@ -59,10 +59,10 @@ quoted_pair = do char '\\'
 --
 
 data MultiPart = MultiPart [BodyPart]
-               deriving Show
+               deriving (Show, Read, Eq, Ord)
 
 data BodyPart = BodyPart [Header] String
-                deriving Show 
+                deriving (Show, Read, Eq, Ord)
 
 -- Based on grammar from RFC 2046, section 5.1.1
 -- The delimiters have been moved around
@@ -161,7 +161,7 @@ data ContentType =
 	ContentType String             -- ^type
 		    String             -- ^ subtype
 		    [(String, String)] -- ^ parameters
-    deriving Show
+    deriving (Show, Read, Eq, Ord)
 
 p_content_type :: Parser ContentType
 p_content_type = 
@@ -172,13 +172,17 @@ p_content_type =
      c_parameters <- many p_parameter
      return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
 
+getContentType :: [Header] -> Maybe ContentType
+getContentType hs = lookup "content-type" hs 
+                    >>= parseMaybe p_content_type "Content-type"
+
 --
 -- * Content transfer encoding
 --
 
 data ContentTransferEncoding =
 	ContentTransferEncoding String
-    deriving Show
+    deriving (Show, Read, Eq, Ord)
 
 p_content_transfer_encoding :: Parser ContentTransferEncoding
 p_content_transfer_encoding =
@@ -186,13 +190,18 @@ p_content_transfer_encoding =
      c_cte <- p_token
      return $ ContentTransferEncoding (map toLower c_cte)
 
+getContentTransferEncoding :: [Header] -> Maybe ContentTransferEncoding
+getContentTransferEncoding hs = lookup "content-transfer-encoding" hs 
+                    >>= parseMaybe p_content_transfer_encoding 
+                            "Content-transfer-encoding"
+
 --
 -- * Content disposition
 --
 
 data ContentDisposition =
 	ContentDisposition String [(String, String)]
-    deriving Show
+    deriving (Show, Read, Eq, Ord)
 
 p_content_disposition :: Parser ContentDisposition
 p_content_disposition =
@@ -200,6 +209,10 @@ p_content_disposition =
      c_cd <- p_token
      c_parameters <- many p_parameter
      return $ ContentDisposition (map toLower c_cd) c_parameters
+
+getContentDisposition :: [Header] -> Maybe ContentDisposition
+getContentDisposition hs = lookup "content-disposition" hs 
+                    >>= parseMaybe p_content_disposition "Content-disposition"
 
 --
 -- * Using parsers
