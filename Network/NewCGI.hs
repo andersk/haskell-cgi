@@ -50,6 +50,8 @@ import System.Environment (getEnv)
 import System.IO (Handle, hPutStr, hPutStrLn, hGetContents,
                   stdin, stdout, hFlush)
 
+import Network.Multipart
+
 -- imports only needed by the compatibility functions
 import Control.Concurrent (forkIO)
 import Control.Exception as Exception (Exception,throw,catch,finally)
@@ -357,11 +359,41 @@ decodeInput :: [(String,String)] -- ^ CGI environment variables.
             -> [(String,String)] -- ^ Input variables and values.
 decodeInput env inp = 
    let inp' = getRequestInput env inp
-     in case lookup "CONTENT_TYPE" env of
-            Just "application/x-www-form-urlencoded" -> formDecode inp'
-            Just x -> [(x,inp)] -- FIXME: report that we don't handle this content-type
+     in case getContentType env of
+            Just (ContentType "application" "x-www-form-urlencoded" _) 
+                -> formDecode inp'
+            Just (ContentType "multipart" "form-data" ps) 
+                -> multipartDecode ps inp'
+            Just x -> [] -- FIXME: report that we don't handle this content type
             -- No content-type given, assume x-www-form-urlencoded
             Nothing -> formDecode inp'
+
+getContentType :: [(String,String)] -> Maybe ContentType
+getContentType env = lookup "CONTENT_TYPE" env 
+                     >>= parseMaybe p_content_type "Content-type"
+
+-- | Decode multipart\/form-data input.
+multipartDecode :: [(String,String)] -- ^ Content-type parameters
+                -> String            -- ^ Request body
+                -> [(String,String)] -- ^ Input variables and values.
+multipartDecode ps inp =
+    case lookup "boundary" ps of
+         Just b -> case parseMaybe (p_multipart_body b) "<request body>" inp of
+                        Just (MultiPart bs) -> map bodyPartToVar bs
+                        Nothing -> [] -- FIXME: report parse error
+         Nothing -> [] -- FIXME: report that there was no boundary
+
+-- FIXME: this should return a more structured type
+bodyPartToVar :: BodyPart -> (String,String)
+bodyPartToVar (BodyPart hs b) = 
+    case disp of
+              Just (ContentDisposition "form-data" ps) -> 
+                  (fromMaybe "" name, b) -- FIXME: get filename, encoding etc.
+                  where name = lookup "name" ps
+              _ -> ("ERROR","ERROR") -- FIXME: report error
+        where disp = lookup "content-disposition" hs
+                     >>= parseMaybe p_content_disposition "Content-disposition"
+
 
 -- | Returns the query string, or the request body if it is
 --   a POST request, or the empty string if there is an error.
