@@ -1,7 +1,7 @@
 Name: cgi
 Version: 0.2
 Copyright: Bjorn Bringert, Andy Gill, Ian Lynagh, Erik Meijer, Sven Panne
-Maintainer: libraries@haskell.org
+Maintainer: bjorn@bringert.net
 Author: Bjorn Bringert
 License: BSD3
 License-file: LICENSE
