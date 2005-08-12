@@ -22,7 +22,7 @@
 
 module Network.NewCGI (
   -- * The CGI monad
-    MonadCGI, CGIT, CGIResult, CGI
+    MonadCGI (..), CGIState (..), CGIT (..), CGIResult, CGI
   , liftIO
   , runCGI, hRunCGI, runCGIEnv
   -- * Output
