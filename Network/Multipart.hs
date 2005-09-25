@@ -158,9 +158,7 @@ p_parameter =
 --
 
 data ContentType = 
-	ContentType String             -- ^type
-		    String             -- ^ subtype
-		    [(String, String)] -- ^ parameters
+	ContentType String String [(String, String)]
     deriving (Show, Read, Eq, Ord)
 
 p_content_type :: Parser ContentType
