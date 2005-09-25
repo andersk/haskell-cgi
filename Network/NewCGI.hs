@@ -4,6 +4,7 @@
 -- Copyright   :  (c) The University of Glasgow 2001
 --                (c) Bjorn Bringert 2004-2005
 --                (c) Ian Lynagh 2005
+--                (c) Jeremy Shaw 2005
 -- License     :  BSD-style
 --
 -- Maintainer  :  bjorn@bringert.net
@@ -30,6 +31,7 @@ module Network.NewCGI (
   , setHeader
   -- * Input
   , getInput, readInput, getInputNames
+  , getMultiInput
   , getInputFilename
   , getVar, getVars
   -- * Cookies
@@ -207,6 +209,7 @@ getVars = cgiGet cgiVars
 --
 
 -- | Get the value of an input variable, for example from a form.
+--   If the variable has multiple values, the first one is returned.
 --   Example:
 --
 -- > query <- getInput "query"
@@ -215,6 +218,19 @@ getInput :: MonadCGI m =>
          -> m (Maybe String) -- ^ The value of the variable,
                              --   or Nothing, if it was not set.
 getInput n = lift2M value (getInput_ n)
+
+-- | Get all the values of an input variable, for example from a form.
+-- This can be used to get all the values from form controls
+-- which allow multiple values to be selected.
+-- Example:
+--
+-- > vals <- getMultiInput "my_checkboxes"
+getMultiInput :: MonadCGI m => 
+                 String -- ^ The name of the variable.
+              -> m [String] -- ^ The values of the variable,
+                            -- or the empty list if the variable was not set.
+getMultiInput n = lift2M value ((map snd . filter (\ (n',_) -> n == n')) 
+                                `liftM` cgiGet cgiInput)
 
 -- | Get the file name of an input.
 getInputFilename :: MonadCGI m =>
