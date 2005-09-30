@@ -18,6 +18,8 @@
 -- Original Version by Erik Meijer <mailto:erik@cs.ruu.nl>.
 -- Further hacked on by Sven Panne <mailto:sven.panne@aedion.de>.
 -- Further hacking by Andy Gill <mailto:andy@galconn.com>.
+-- A new, hopefully more flexible, interface
+-- and support for file upload by Bjorn Bringert <mailto:bjorn@bringert.net>.
 --
 -----------------------------------------------------------------------------
 
