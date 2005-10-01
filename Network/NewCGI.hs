@@ -28,6 +28,8 @@ module Network.NewCGI (
     MonadCGI (..), CGIState (..), CGIT (..), CGIResult, CGI
   , liftIO
   , runCGI, hRunCGI, runCGIEnv
+  -- * Error handling
+  , handleExceptionCGI
   -- * Output
   , output, redirect
   , setHeader
@@ -43,8 +45,9 @@ module Network.NewCGI (
   , Html, wrapper, pwrapper, connectToCGIScript
   ) where
 
+import Control.Exception as Exception (try)
 import Control.Monad (liftM, unless)
-import Control.Monad.State (StateT, gets, lift, modify, runStateT)
+import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
 import Data.List (intersperse)
 import Data.Maybe (listToMaybe, fromMaybe)
@@ -170,6 +173,16 @@ defaultContentType = "text/html; charset=ISO-8859-1"
 
 formatResponse :: String -> [(String,String)]-> String
 formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
+
+--
+-- * Error handling
+--
+
+handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
+handleExceptionCGI (CGIT c) h = 
+    CGIT (StateT (\s -> f s (runStateT c s))) >>= either h return
+  where 
+  f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
 
 --
 -- * Output \/ redirect
