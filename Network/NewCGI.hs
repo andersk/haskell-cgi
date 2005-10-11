@@ -30,6 +30,8 @@ module Network.NewCGI (
   , runCGI, hRunCGI, runCGIEnv
   -- * Error handling
   , handleExceptionCGI
+  -- * Logging
+  , logCGI
   -- * Output
   , output, redirect
   , setHeader
@@ -56,7 +58,7 @@ import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
 import System.Environment (getEnv)
 import System.IO (Handle, hPutStr, hPutStrLn, hGetContents,
-                  stdin, stdout, hFlush)
+                  stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
 
@@ -175,14 +177,23 @@ formatResponse :: String -> [(String,String)]-> String
 formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
 
 --
--- * Error handling
+-- * Logging and error handling
 --
 
+-- | Handle an exception.
+--   FIXME: could this be generalized?
 handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
 handleExceptionCGI (CGIT c) h = 
     CGIT (StateT (\s -> f s (runStateT c s))) >>= either h return
   where 
   f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
+
+-- | Log some message using the server\'s logging facility.
+-- FIXME: does this have to be more general to support
+-- FastCGI etc? Maybe we should store log messages in the
+-- CGIState?
+logCGI :: MonadIO m => String -> CGIT m ()
+logCGI s = liftIO (hPutStrLn stderr s)
 
 --
 -- * Output \/ redirect
