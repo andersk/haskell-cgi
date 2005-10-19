@@ -172,7 +172,7 @@ p_content_type =
 
 getContentType :: [Header] -> Maybe ContentType
 getContentType hs = lookup "content-type" hs 
-                    >>= parseMaybe p_content_type "Content-type"
+                    >>= parseM p_content_type "Content-type"
 
 --
 -- * Content transfer encoding
@@ -190,7 +190,7 @@ p_content_transfer_encoding =
 
 getContentTransferEncoding :: [Header] -> Maybe ContentTransferEncoding
 getContentTransferEncoding hs = lookup "content-transfer-encoding" hs 
-                    >>= parseMaybe p_content_transfer_encoding 
+                    >>= parseM p_content_transfer_encoding 
                             "Content-transfer-encoding"
 
 --
@@ -210,17 +210,17 @@ p_content_disposition =
 
 getContentDisposition :: [Header] -> Maybe ContentDisposition
 getContentDisposition hs = lookup "content-disposition" hs 
-                    >>= parseMaybe p_content_disposition "Content-disposition"
+                    >>= parseM p_content_disposition "Content-disposition"
 
 --
 -- * Using parsers
 --
 
-parseMaybe :: Parser a -> SourceName -> String -> Maybe a
-parseMaybe p n inp =
+parseM :: Monad m => Parser a -> SourceName -> String -> m a
+parseM p n inp =
   case parse p n inp of
-    Left _ -> Nothing
-    Right x -> Just x
+    Left e -> fail (show e)
+    Right x -> return x
 
 parseSuccessfully :: Parser a -> SourceName -> String -> a
 parseSuccessfully p n inp =

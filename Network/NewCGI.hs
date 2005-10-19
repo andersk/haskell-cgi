@@ -434,7 +434,7 @@ decodeInput :: [(String,String)] -- ^ CGI environment variables.
 decodeInput env inp = 
    let inp' = getRequestInput env inp
        ctype = lookup "CONTENT_TYPE" env 
-                     >>= parseMaybe p_content_type "Content-type"
+                     >>= parseM p_content_type "Content-type"
      in case ctype of
             Just (ContentType "application" "x-www-form-urlencoded" _) 
                 -> formDecode' inp'
@@ -460,7 +460,7 @@ multipartDecode :: [(String,String)] -- ^ Content-type parameters
                 -> [(String,Input)] -- ^ Input variables and values.
 multipartDecode ps inp =
     case lookup "boundary" ps of
-         Just b -> case parseMaybe (p_multipart_body b) "<request body>" inp of
+         Just b -> case parseM (p_multipart_body b) "<request body>" inp of
                         Just (MultiPart bs) -> map bodyPartToInput bs
                         Nothing -> [] -- FIXME: report parse error
          Nothing -> [] -- FIXME: report that there was no boundary
