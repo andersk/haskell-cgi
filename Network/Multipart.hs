@@ -1,6 +1,8 @@
 -- parsing of the multipart format from RFC2046
 
 -- based on code from WASHMail, © 2001, 2002 Peter Thiemann
+
+-- this needs to be rewritten to use some fast string library
 module Network.Multipart where
 
 import Data.Char
