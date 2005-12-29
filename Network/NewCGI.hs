@@ -399,6 +399,7 @@ cgiVarNames =
    , "SERVER_SOFTWARE"
    , "SERVER_NAME"
    , "REQUEST_METHOD"
+   , "REQUEST_URI"
    , "SERVER_ADMIN"
    , "SERVER_PORT"
    , "QUERY_STRING"
