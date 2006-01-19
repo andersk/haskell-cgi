@@ -101,6 +101,9 @@ data CGIResult = CGIOutput String
 -- * CGIT monad transformer
 --
 
+instance Monad m => Functor (CGIT m) where
+    fmap f c = CGIT (fmap f (unCGIT c))
+
 instance Monad m => Monad (CGIT m) where
     c >>= f = CGIT (unCGIT c >>= unCGIT . f)
     return = CGIT . return
