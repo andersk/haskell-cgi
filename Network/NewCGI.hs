@@ -36,7 +36,8 @@ module Network.NewCGI (
   , output, redirect
   , setHeader
   -- * Input
-  , getInput, getInputFPS, readInput, getInputNames
+  , getInput, getInputFPS, readInput
+  , getInputs, getInputNames
   , getMultiInput
   , getInputFilename
   , getVar, getVars
@@ -53,6 +54,8 @@ import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
 import Data.List (intersperse)
 import Data.Maybe (listToMaybe, fromMaybe)
+import qualified Data.Map as Map
+import Data.Map (Map)
 import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
@@ -76,18 +79,18 @@ import Text.Html (Html, renderHtml)
 
 
 data CGIState = CGIState {
-                          cgiVars :: [(String,String)],
-                          cgiInput :: [(String,Input)],
+                          cgiVars :: Map String String,
+                          cgiInput :: Map String [Input],
                           cgiResponseHeaders :: [(String,String)]
                          }
-              deriving (Show, Read, Eq, Ord)
+              deriving Show
 
 data Input = Input {
                     value :: FastString,
                     filename :: Maybe String,
                     contentType :: ContentType
                    }
-              deriving (Show, Read, Eq, Ord)
+              deriving Show
 
 -- | The CGIT monad transformer.
 newtype CGIT m a = CGIT { unCGIT :: StateT CGIState m a }
@@ -175,8 +178,8 @@ runCGIEnvFPS :: Monad m =>
           -> m String -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
     = do let s = CGIState {
-                           cgiVars = vars,
-                           cgiInput = decodeInput vars inp,
+                           cgiVars = Map.fromList vars,
+                           cgiInput = mkMultiMap $ decodeInput vars inp,
                            cgiResponseHeaders = initHeaders
                           }
          (outp,s') <- runStateT (unCGIT f) s
@@ -245,7 +248,7 @@ getVar name = liftM (lookup name) getVars
 -- | Get all CGI environment variables and their values.
 getVars :: MonadCGI m =>
            m [(String,String)]
-getVars = cgiGet cgiVars
+getVars = liftM Map.toList $ cgiGet cgiVars
 
 --
 -- * Query input
@@ -283,9 +286,8 @@ getMultiInput :: MonadCGI m =>
                  String -- ^ The name of the variable.
               -> m [String] -- ^ The values of the variable,
                             -- or the empty list if the variable was not set.
-getMultiInput n = lift2M inputValue
-                     ((map snd . filter (\ (n',_) -> n == n')) 
-                                `liftM` cgiGet cgiInput)
+getMultiInput n = 
+    (map inputValue . Map.findWithDefault [] n) `liftM` cgiGet cgiInput
 
 -- | Get the file name of an input.
 getInputFilename :: MonadCGI m =>
@@ -295,7 +297,8 @@ getInputFilename :: MonadCGI m =>
 getInputFilename n = inside filename (getInput_ n)
 
 getInput_ ::  MonadCGI m => String -> m (Maybe Input)
-getInput_ n = lookup n `liftM` cgiGet cgiInput
+getInput_ n = 
+    (maybe Nothing listToMaybe . Map.lookup n) `liftM` cgiGet cgiInput
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: (Read a, MonadCGI m) =>
@@ -305,9 +308,14 @@ readInput :: (Read a, MonadCGI m) =>
                            --   as the desired type.
 readInput name = maybeRead `inside` getInput name
 
+-- | Get the names and values of all inputs.
+getInputs :: MonadCGI m => m [(String,String)]
+getInputs = (f . Map.toList) `liftM` cgiGet cgiInput
+  where f ps = [ (n,inputValue i) | (n,i:_) <- ps ]
+
 -- | Get the names of all input variables.
 getInputNames :: MonadCGI m => m [String]
-getInputNames = map fst `liftM` cgiGet cgiInput
+getInputNames = Map.keys `liftM` cgiGet cgiInput
 
 --
 -- * Cookies
@@ -358,6 +366,9 @@ initHeaders = []
 --
 -- * Utilities
 --
+
+mkMultiMap :: Ord a => [(a,b)] -> Map a [b]
+mkMultiMap xs = Map.fromListWith (++) [(x,[y]) | (x,y) <- xs]
 
 -- | Replace all instances of a value in a list by another value.
 replace :: Eq a =>
@@ -579,7 +590,7 @@ accept' sock = do
 wrapCGI :: MonadIO m => ([(String,String)] -> IO Html) -> CGIT m CGIResult
 wrapCGI f = do
             vs <- getVars
-            is <- map (\(n,v) -> (n, inputValue v)) `liftM` cgiGet cgiInput
+            is <- getInputs
             html <- liftIO (f (vs++is))
             output (renderHtml html)
 
