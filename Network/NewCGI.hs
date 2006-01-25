@@ -309,9 +309,11 @@ readInput :: (Read a, MonadCGI m) =>
 readInput name = maybeRead `inside` getInput name
 
 -- | Get the names and values of all inputs.
+--   Note: the same name may occur more than once in the output,
+--   if there are several values for the name.
 getInputs :: MonadCGI m => m [(String,String)]
 getInputs = (f . Map.toList) `liftM` cgiGet cgiInput
-  where f ps = [ (n,inputValue i) | (n,i:_) <- ps ]
+  where f ps = [ (n,inputValue i) | (n,is) <- ps, i <- is ]
 
 -- | Get the names of all input variables.
 getInputNames :: MonadCGI m => m [String]
