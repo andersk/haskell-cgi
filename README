@@ -1,0 +1,15 @@
+This is a Haskell library for writing CGI programs.
+
+Requirements:
+
+GHC 6.4 or later. Not yet tested with other Haskell implementations.
+
+The FastPackedString package, available from
+http://www.cse.unsw.edu.au/~dons/fps.html
+
+
+Installation:
+
+$ runghc Setup.hs configure
+$ runghc Setup.hs build
+$ runghc Setup.hs install

@@ -2,7 +2,7 @@
 -- |
 -- Module      :  Network.CGI
 -- Copyright   :  (c) The University of Glasgow 2001
---                (c) Bjorn Bringert 2004-2005
+--                (c) Bjorn Bringert 2004-2006
 --                (c) Ian Lynagh 2005
 --                (c) Jeremy Shaw 2005
 -- License     :  BSD-style
@@ -11,7 +11,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Monad.State)
 --
--- Simple library for writing CGI programs.
+-- Simple Library for writing CGI programs.
 --
 -- Based on the original Haskell binding for CGI:
 --
@@ -19,7 +19,7 @@
 -- Further hacked on by Sven Panne <mailto:sven.panne@aedion.de>.
 -- Further hacking by Andy Gill <mailto:andy@galconn.com>.
 -- A new, hopefully more flexible, interface
--- and support for file upload by Bjorn Bringert <mailto:bjorn@bringert.net>.
+-- and support for file uploads by Bjorn Bringert <mailto:bjorn@bringert.net>.
 --
 -----------------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ module Network.NewCGI (
   , output, redirect
   , setHeader
   -- * Input
-  , getInput, readInput, getInputNames
+  , getInput, getInputFPS, readInput, getInputNames
   , getMultiInput
   , getInputFilename
   , getVar, getVars
@@ -61,6 +61,9 @@ import System.IO (Handle, hPutStr, hPutStrLn, hGetContents,
                   stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
+import qualified Data.FastPackedString as FPS
+import Data.FastPackedString (FastString)
+
 
 -- imports only needed by the compatibility functions
 import Control.Concurrent (forkIO)
@@ -80,7 +83,7 @@ data CGIState = CGIState {
               deriving (Show, Read, Eq, Ord)
 
 data Input = Input {
-                    value :: String,
+                    value :: FastString,
                     filename :: Maybe String,
                     contentType :: ContentType
                    }
@@ -152,14 +155,25 @@ hRunCGI hin hout f = do env <- liftIO getCgiVars
                         liftIO $ hPutStr hout outp
                         liftIO $ hFlush hout
 
--- | Run a CGI action in a given environment, using (lazy) strings
---   for input and output.
+-- | Run a CGI action in a given environment, using strings
+--   for input and output. Note: this can be inefficient,
+--   especially with file uploads. Use 'runCGIEnvFPS'
+--   instead.
 runCGIEnv :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
           -> String -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
           -> m String -- ^ Response (headers and content).
-runCGIEnv vars inp f
+runCGIEnv vars inp f = runCGIEnvFPS vars (FPS.pack inp) f
+
+-- | Run a CGI action in a given environment, using a 'FastString'
+--   for input and a lazy string for output. 
+runCGIEnvFPS :: Monad m =>
+             [(String,String)] -- ^ CGI environment variables.
+          -> FastString -- ^ Request body.
+          -> CGIT m CGIResult -- ^ CGI action.
+          -> m String -- ^ Response (headers and content).
+runCGIEnvFPS vars inp f
     = do let s = CGIState {
                            cgiVars = vars,
                            cgiInput = decodeInput vars inp,
@@ -237,6 +251,10 @@ getVars = cgiGet cgiVars
 -- * Query input
 --
 
+-- | Get the value of an input as a 'String'.
+inputValue :: Input -> String
+inputValue = FPS.unpack . value
+
 -- | Get the value of an input variable, for example from a form.
 --   If the variable has multiple values, the first one is returned.
 --   Example:
@@ -246,7 +264,14 @@ getInput :: MonadCGI m =>
             String           -- ^ The name of the variable.
          -> m (Maybe String) -- ^ The value of the variable,
                              --   or Nothing, if it was not set.
-getInput n = lift2M value (getInput_ n)
+getInput n = lift2M inputValue (getInput_ n)
+
+-- | Like 'getInput', but returns a 'FastString'.
+getInputFPS :: MonadCGI m =>
+            String           -- ^ The name of the variable.
+         -> m (Maybe FastString) -- ^ The value of the variable,
+                             --   or Nothing, if it was not set.
+getInputFPS n = lift2M value (getInput_ n)
 
 -- | Get all the values of an input variable, for example from a form.
 -- This can be used to get all the values from form controls
@@ -258,7 +283,8 @@ getMultiInput :: MonadCGI m =>
                  String -- ^ The name of the variable.
               -> m [String] -- ^ The values of the variable,
                             -- or the empty list if the variable was not set.
-getMultiInput n = lift2M value ((map snd . filter (\ (n',_) -> n == n')) 
+getMultiInput n = lift2M inputValue
+                     ((map snd . filter (\ (n',_) -> n == n')) 
                                 `liftM` cgiGet cgiInput)
 
 -- | Get the file name of an input.
@@ -433,12 +459,11 @@ cgiVarNames =
 -- | Get and decode the input according to the request
 --   method and the content-type.
 decodeInput :: [(String,String)] -- ^ CGI environment variables.
-            -> String            -- ^ Request body.
+            -> FastString            -- ^ Request body.
             -> [(String,Input)] -- ^ Input variables and values.
 decodeInput env inp = 
    let inp' = getRequestInput env inp
-       ctype = lookup "CONTENT_TYPE" env 
-                     >>= parseM p_content_type "Content-type"
+       ctype = lookup "CONTENT_TYPE" env >>= parseContentType
      in case ctype of
             Just (ContentType "application" "x-www-form-urlencoded" _) 
                 -> formDecode' inp'
@@ -447,10 +472,10 @@ decodeInput env inp =
             Just _ -> [] -- FIXME: report that we don't handle this content type
             -- No content-type given, assume x-www-form-urlencoded
             Nothing -> formDecode' inp'
-    where formDecode' i = [ (n, simpleInput v) | (n,v) <- formDecode i]
+    where formDecode' i = [ (n, simpleInput v) | (n,v) <- formDecode $ FPS.unpack i]
 
 simpleInput :: String -> Input
-simpleInput v = Input { value = v,
+simpleInput v = Input { value = FPS.pack v,
                         filename = Nothing,
                         contentType = defaultInputType }
 
@@ -460,11 +485,11 @@ defaultInputType = ContentType "text" "plain" [] -- FIXME: use some default enco
 
 -- | Decode multipart\/form-data input.
 multipartDecode :: [(String,String)] -- ^ Content-type parameters
-                -> String            -- ^ Request body
+                -> FastString            -- ^ Request body
                 -> [(String,Input)] -- ^ Input variables and values.
 multipartDecode ps inp =
     case lookup "boundary" ps of
-         Just b -> case parseM (p_multipart_body b) "<request body>" inp of
+         Just b -> case parseMultipartBody b inp of
                         Just (MultiPart bs) -> map bodyPartToInput bs
                         Nothing -> [] -- FIXME: report parse error
          Nothing -> [] -- FIXME: report that there was no boundary
@@ -483,25 +508,23 @@ bodyPartToInput (BodyPart hs b) =
 -- | Returns the query string, or the request body if it is
 --   a POST request, or the empty string if there is an error.
 getRequestInput :: [(String,String)] -- ^ CGI environment variables.
-                -> String            -- ^ Request body.
-                -> String            -- ^ Query string.
+                -> FastString            -- ^ Request body.
+                -> FastString            -- ^ Query string.
 getRequestInput env req =
    case lookup "REQUEST_METHOD" env of
       Just "POST" -> takeInput env req
-      _ -> lookupOrNil "QUERY_STRING" env
+      _ -> FPS.pack $ lookupOrNil "QUERY_STRING" env
 
 -- | Take the right number of bytes from the input.
 takeInput :: [(String,String)]  -- ^ CGI environment variables.
-          -> String             -- ^ Request body.
-          -> String             -- ^ CONTENT_LENGTH bytes from the request body,
+          -> FastString             -- ^ Request body.
+          -> FastString             -- ^ CONTENT_LENGTH bytes from the request body,
                                 --   or the empty string if there is no
                                 --   CONTENT_LENGTH.
 takeInput env req = 
     case len of
-           -- FIXME: we should check that length req == len,
-           -- but that would force evaluation of req
-           Just l  -> take l req
-           Nothing -> ""
+           Just l  -> FPS.take l req
+           Nothing -> FPS.empty
      where len = lookup "CONTENT_LENGTH" env >>= maybeRead
 
 -- | Get the name-value pairs from application\/x-www-form-urlencoded data.
@@ -556,7 +579,7 @@ accept' sock = do
 wrapCGI :: MonadIO m => ([(String,String)] -> IO Html) -> CGIT m CGIResult
 wrapCGI f = do
             vs <- getVars
-            is <- map (\(n,v) -> (n, value v)) `liftM` cgiGet cgiInput
+            is <- map (\(n,v) -> (n, inputValue v)) `liftM` cgiGet cgiInput
             html <- liftIO (f (vs++is))
             output (renderHtml html)
 
@@ -565,11 +588,11 @@ connectToCGIScript :: String -> PortID -> IO ()
 connectToCGIScript host portId
      = do env <- getCgiVars
           input <- getContents
-          let str = getRequestInput env input
+          let str = getRequestInput env (FPS.pack input)
           h <- connectTo host portId
                  `Exception.catch`
                    (\ e -> abort "Cannot connect to CGI daemon." e)
-          hPutStrLn h str
+          FPS.hPut h str >> hPutStrLn h ""
           (sendBack h `finally` hClose h)
                `Prelude.catch` (\e -> unless (isEOFError e) (ioError e))
 

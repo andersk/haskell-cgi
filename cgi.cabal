@@ -6,7 +6,7 @@ Maintainer: bjorn@bringert.net
 Author: Bjorn Bringert
 License: BSD3
 License-file: LICENSE
-build-depends: haskell98, base, network, parsec, mtl
+build-depends: haskell98, base, network, parsec, mtl, fps
 Extensions: 
 Synopsis: Library for writing CGI programs.
 Exposed-Modules: 
