@@ -27,7 +27,7 @@ module Network.NewCGI (
   -- * The CGI monad
     MonadCGI (..), CGIState (..), CGIT (..), CGIResult, CGI
   , liftIO
-  , runCGI, hRunCGI, runCGIEnv
+  , runCGI, hRunCGI, runCGIEnv, runCGIEnvFPS
   -- * Error handling
   , handleExceptionCGI
   -- * Logging
