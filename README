@@ -6,7 +6,8 @@ GHC 6.4 or later. Not yet tested with other Haskell implementations.
 
 The FastPackedString package, available from
 http://www.cse.unsw.edu.au/~dons/fps.html
-
+Some recent additions to FastPackedString are used,
+so currently (2006-02-03) you need the current darcs version.
 
 Installation:
 
