@@ -52,6 +52,7 @@ import Control.Exception as Exception (try)
 import Control.Monad (liftM, unless)
 import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
+import Data.Char (toLower)
 import Data.List (intersperse)
 import Data.Maybe (listToMaybe, fromMaybe)
 import qualified Data.Map as Map
@@ -380,20 +381,21 @@ replace :: Eq a =>
         -> [a] -- ^ Output list
 replace x y = map (\z -> if z == x then y else z)
 
--- | Set a value in a lookup table.
-tableSet :: Eq a => a -> b -> [(a,b)] -> [(a,b)]
+-- | Set a value in a lookup table with case-insensitive 
+--   key comparison.
+tableSet :: String -> b -> [(String,b)] -> [(String,b)]
 tableSet k v [] = [(k,v)]
 tableSet k v ((k',v'):ts)
-    | k == k' = (k,v) : ts
+    | map toLower k == map toLower k' = (k,v) : ts
     | otherwise = (k',v') : tableSet k v ts
 
 -- | Add a key, value pair to a table only if there is no entry
 --   with the given key already in the table. If there is an entry
---   already, nothing is done.
-tableAddIfNotPresent :: Eq a => a -> b -> [(a,b)] -> [(a,b)]
+--   already, nothing is done. Case-insensitive key comparison.
+tableAddIfNotPresent :: String -> b -> [(String,b)] -> [(String,b)]
 tableAddIfNotPresent k v [] = [(k,v)]
 tableAddIfNotPresent k v ((k',v'):ts)
-    | k == k' = (k',v') : ts
+    | map toLower k == map toLower k' = (k',v') : ts
     | otherwise = (k',v') : tableAddIfNotPresent k v ts
 
 concatS :: [ShowS] -> ShowS
