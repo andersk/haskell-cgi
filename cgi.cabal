@@ -9,17 +9,17 @@ License: BSD3
 License-file: LICENSE
 Build-depends: haskell98, base, network, parsec, mtl, fps
 Extensions: 
-Synopsis: A library for writing CGI programs.
+Synopsis: A Haskell library for writing CGI programs
 Description:
  This is a Haskell library for writing CGI programs. 
  Its features include:
- * Access to CGI parameters (e.g. form input) from
+ - Access to CGI parameters (e.g. form input) from
    both GET and POST requests.
- * Access to CGI environment variables.
- * Ability to set arbitrary response headers.
- * Support for HTTP cookies.
- * Efficient file upload support.
- * Wrapper functions for compatibility with the existing
+ - Access to CGI environment variables.
+ - Ability to set arbitrary response headers.
+ - Support for HTTP cookies.
+ - Efficient file upload support.
+ - Wrapper functions for compatibility with the existing
    Network.CGI module.
 Exposed-Modules: 
    Network.NewCGI,
