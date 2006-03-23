@@ -12,6 +12,7 @@ Synopsis: Library for writing CGI programs.
 Exposed-Modules: 
    Network.NewCGI,
    Network.Multipart,
+   Network.RFC822Headers,
    Network.HTTP.Cookie
 ghc-options: -O2 -Wall
 
