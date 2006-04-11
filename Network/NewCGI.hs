@@ -43,7 +43,8 @@ module Network.NewCGI (
   , getVar, getVars
   -- * Cookies
   , Cookie(..), newCookie
-  , getCookie, setCookie, deleteCookie
+  , getCookie, readCookie
+  , setCookie, deleteCookie
   -- * Compatibility
   , Html, wrapper, pwrapper, connectToCGIScript
   ) where
@@ -326,9 +327,17 @@ getInputNames = Map.keys `liftM` cgiGet cgiInput
 
 -- | Get the value of a cookie.
 getCookie :: MonadCGI m =>
-             String             -- ^ The name of the cookie.
-          -> m (Maybe String)
+             String           -- ^ The name of the cookie.
+          -> m (Maybe String) -- ^ 'Nothing' if the cookie does not exist.
 getCookie name = findCookie name `inside` getVar "HTTP_COOKIE"
+
+-- | Same as 'getCookie', but tries to read the value to the desired type.
+readCookie :: (Read a, MonadCGI m) =>
+              String       -- ^ The name of the cookie.
+            -> m (Maybe a) -- ^ 'Nothing' if the cookie does not exist
+                           --   or if the value could not be interpreted
+                           --   as the desired type.
+readCookie name = maybeRead `inside` getCookie name
 
 -- | Set a cookie.
 setCookie :: MonadCGI m => Cookie -> m ()
