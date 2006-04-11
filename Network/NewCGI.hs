@@ -307,7 +307,7 @@ readInput :: (Read a, MonadCGI m) =>
              String        -- ^ The name of the variable.
           -> m (Maybe a) -- ^ 'Nothing' if the variable does not exist
                            --   or if the value could not be interpreted
-                           --   as the desired type.
+                           --   at the desired type.
 readInput name = maybeRead `inside` getInput name
 
 -- | Get the names and values of all inputs.
@@ -336,7 +336,7 @@ readCookie :: (Read a, MonadCGI m) =>
               String       -- ^ The name of the cookie.
             -> m (Maybe a) -- ^ 'Nothing' if the cookie does not exist
                            --   or if the value could not be interpreted
-                           --   as the desired type.
+                           --   at the desired type.
 readCookie name = maybeRead `inside` getCookie name
 
 -- | Set a cookie.
