@@ -62,7 +62,7 @@ import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
 import System.Environment (getEnv)
-import System.IO (Handle, hPutStr, hPutStrLn, hGetContents,
+import System.IO (Handle, hPutStr, hPutStrLn,
                   stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
@@ -155,8 +155,8 @@ hRunCGI :: MonadIO m =>
         -> Handle -- ^ Handle that output will be written to.
         -> CGIT m CGIResult -> m ()
 hRunCGI hin hout f = do env <- liftIO getCgiVars
-                        inp <- liftIO $ hGetContents hin
-                        outp <- runCGIEnv env inp f
+                        inp <- liftIO $ FPS.hGetContents hin
+                        outp <- runCGIEnvFPS env inp f
                         liftIO $ hPutStr hout outp
                         liftIO $ hFlush hout
 
