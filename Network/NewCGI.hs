@@ -438,7 +438,7 @@ lookupOrNil n = fromMaybe "" . lookup n
 
 
 --
--- * CGI protocol stuff
+-- * Environment variables
 --
 
 getCgiVars :: IO [(String,String)]
@@ -480,37 +480,99 @@ cgiVarNames =
    , "HTTP_USER_AGENT"
    ]
 
+--
+-- * Inputs
+--
+
 -- | Get and decode the input according to the request
 --   method and the content-type.
 decodeInput :: [(String,String)] -- ^ CGI environment variables.
-            -> FastString            -- ^ Request body.
-            -> [(String,Input)] -- ^ Input variables and values.
-decodeInput env inp = 
-   let inp' = getRequestInput env inp
-       ctype = lookup "CONTENT_TYPE" env >>= parseContentType
-     in case ctype of
-            Just (ContentType "application" "x-www-form-urlencoded" _) 
-                -> formDecode' inp'
-            Just (ContentType "multipart" "form-data" ps) 
-                -> multipartDecode ps inp'
-            Just _ -> [] -- FIXME: report that we don't handle this content type
-            -- No content-type given, assume x-www-form-urlencoded
-            Nothing -> formDecode' inp'
-    where formDecode' i = [ (n, simpleInput v) | (n,v) <- formDecode $ FPS.unpack i]
+            -> FastString        -- ^ Request body.
+            -> [(String,Input)]  -- ^ Input variables and values.
+decodeInput env inp = queryInput env ++ bodyInput env inp
 
+-- | Build an 'Input' object for a simple value.
 simpleInput :: String -> Input
 simpleInput v = Input { value = FPS.pack v,
                         filename = Nothing,
                         contentType = defaultInputType }
 
+-- | The default content-type for variables.
 defaultInputType :: ContentType
 defaultInputType = ContentType "text" "plain" [] -- FIXME: use some default encoding?
 
+--
+-- * Query string and x-www-form-urlencoded stuff
+--
+
+-- | Get inputs from the query string.
+queryInput :: [(String,String)] -- ^ CGI environment variables.
+           -> [(String,Input)] -- ^ Input variables and values.
+queryInput env = formInput $ lookupOrNil "QUERY_STRING" env
+
+-- | Decode application\/x-www-form-urlencoded inputs.
+formInput :: String
+          -> [(String,Input)] -- ^ Input variables and values.
+formInput qs = [(n, simpleInput v) | (n,v) <- formDecode qs]
+
+-- | Get the name-value pairs from application\/x-www-form-urlencoded data.
+formDecode :: String -> [(String,String)]
+formDecode "" = []
+formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
+    where (nv,rs) = break (=='&') s
+          (n,v) = break (=='=') nv
+
+-- | Convert a single value from the application\/x-www-form-urlencoded encoding.
+urlDecode :: String -> String
+urlDecode = unEscapeString . replace '+' ' '
+
+
+
+--
+-- * Request content and form-data stuff
+--
+
+-- | Get input variables from the body, if any.
+bodyInput :: [(String,String)] -- ^ CGI environment variables.
+          -> FastString        -- ^ Request body.
+          -> [(String,Input)]  -- ^ Input variables and values.
+bodyInput env inp =
+   case lookup "REQUEST_METHOD" env of
+      Just "POST" -> 
+          let ctype = lookup "CONTENT_TYPE" env >>= parseContentType
+           in decodeBody ctype $ takeInput env inp
+      _ -> []
+
+-- | Decode a POST body.
+decodeBody :: Maybe ContentType -- ^ Content-type, if any
+           -> FastString        -- ^ Request body
+           -> [(String,Input)]  -- ^ Input variables and values.
+decodeBody ctype inp = 
+    case ctype of
+               Just (ContentType "application" "x-www-form-urlencoded" _) 
+                   -> formInput (FPS.unpack inp)
+               Just (ContentType "multipart" "form-data" ps) 
+                   -> multipartDecode ps inp
+               Just _ -> [] -- FIXME: report that we don't handle this content type
+               -- No content-type given, assume x-www-form-urlencoded
+               Nothing -> formInput (FPS.unpack inp)
+
+-- | Take the right number of bytes from the input.
+takeInput :: [(String,String)]  -- ^ CGI environment variables.
+          -> FastString             -- ^ Request body.
+          -> FastString             -- ^ CONTENT_LENGTH bytes from the request body,
+                                --   or the empty string if there is no
+                                --   CONTENT_LENGTH.
+takeInput env req = 
+    case len of
+           Just l  -> FPS.take l req
+           Nothing -> FPS.empty
+     where len = lookup "CONTENT_LENGTH" env >>= maybeRead
 
 -- | Decode multipart\/form-data input.
 multipartDecode :: [(String,String)] -- ^ Content-type parameters
-                -> FastString            -- ^ Request body
-                -> [(String,Input)] -- ^ Input variables and values.
+                -> FastString        -- ^ Request body
+                -> [(String,Input)]  -- ^ Input variables and values.
 multipartDecode ps inp =
     case lookup "boundary" ps of
          Just b -> case parseMultipartBody b inp of
@@ -528,39 +590,6 @@ bodyPartToInput (BodyPart hs b) =
                            contentType = ctype })
               _ -> ("ERROR",simpleInput "ERROR") -- FIXME: report error
     where ctype = fromMaybe defaultInputType (getContentType hs)
-
--- | Returns the query string, or the request body if it is
---   a POST request, or the empty string if there is an error.
-getRequestInput :: [(String,String)] -- ^ CGI environment variables.
-                -> FastString            -- ^ Request body.
-                -> FastString            -- ^ Query string.
-getRequestInput env req =
-   case lookup "REQUEST_METHOD" env of
-      Just "POST" -> takeInput env req
-      _ -> FPS.pack $ lookupOrNil "QUERY_STRING" env
-
--- | Take the right number of bytes from the input.
-takeInput :: [(String,String)]  -- ^ CGI environment variables.
-          -> FastString             -- ^ Request body.
-          -> FastString             -- ^ CONTENT_LENGTH bytes from the request body,
-                                --   or the empty string if there is no
-                                --   CONTENT_LENGTH.
-takeInput env req = 
-    case len of
-           Just l  -> FPS.take l req
-           Nothing -> FPS.empty
-     where len = lookup "CONTENT_LENGTH" env >>= maybeRead
-
--- | Get the name-value pairs from application\/x-www-form-urlencoded data.
-formDecode :: String -> [(String,String)]
-formDecode "" = []
-formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
-    where (nv,rs) = break (=='&') s
-          (n,v) = break (=='=') nv
-
--- | Convert a single value from the application\/x-www-form-urlencoded encoding.
-urlDecode :: String -> String
-urlDecode = unEscapeString . replace '+' ' '
 
 
 
@@ -611,14 +640,24 @@ wrapCGI f = do
 connectToCGIScript :: String -> PortID -> IO ()
 connectToCGIScript host portId
      = do env <- getCgiVars
-          input <- getContents
-          let str = getRequestInput env (FPS.pack input)
+          input <- FPS.hGetContents stdin
+          let str = getRequestInput env input
           h <- connectTo host portId
                  `Exception.catch`
                    (\ e -> abort "Cannot connect to CGI daemon." e)
           FPS.hPut h str >> hPutStrLn h ""
           (sendBack h `finally` hClose h)
                `Prelude.catch` (\e -> unless (isEOFError e) (ioError e))
+
+-- | Returns the query string, or the request body if it is
+--   a POST request, or the empty string if there is an error.
+getRequestInput :: [(String,String)] -- ^ CGI environment variables.
+                -> FastString            -- ^ Request body.
+                -> FastString            -- ^ Query string.
+getRequestInput env req =
+   case lookup "REQUEST_METHOD" env of
+      Just "POST" -> takeInput env req
+      _ -> FPS.pack $ lookupOrNil "QUERY_STRING" env
 
 abort :: String -> Exception -> IO a
 abort msg e =
