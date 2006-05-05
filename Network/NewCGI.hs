@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.CGI
+-- Module      :  Network.NewCGI
 -- Copyright   :  (c) The University of Glasgow 2001
 --                (c) Bjorn Bringert 2004-2006
 --                (c) Ian Lynagh 2005
@@ -130,13 +130,6 @@ class Monad m => MonadCGI m where
 instance Monad m => MonadCGI (CGIT m) where
     cgiModify = CGIT . modify
     cgiGet = CGIT . gets
-
-{-
--- requires -fallow-undecidable-instances and -fallow-overlapping-instances
-instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
-    cgiModify f = lift (cgiModify f)
-    cgiGet f = lift (cgiGet f)
--}
 
 instance MonadTrans CGIT where
     lift = CGIT . lift
