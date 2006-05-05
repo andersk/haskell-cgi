@@ -214,7 +214,7 @@ handleExceptionCGI (CGIT c) h =
 -- FIXME: does this have to be more general to support
 -- FastCGI etc? Maybe we should store log messages in the
 -- CGIState?
-logCGI :: MonadIO m => String -> CGIT m ()
+logCGI :: (MonadCGI m, MonadIO m) => String -> m ()
 logCGI s = liftIO (hPutStrLn stderr s)
 
 --
