@@ -33,7 +33,7 @@ module Network.NewCGI (
   -- * Logging
   , logCGI
   -- * Output
-  , output, redirect
+  , output, outputFPS, redirect
   , setHeader
   -- * Input
   , getInput, getInputFPS, readInput
@@ -54,7 +54,6 @@ import Control.Monad (liftM, unless)
 import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
 import Data.Char (toLower)
-import Data.List (intersperse)
 import Data.Maybe (listToMaybe, fromMaybe)
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -62,7 +61,7 @@ import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
 import System.Environment (getEnv)
-import System.IO (Handle, hPutStr, hPutStrLn,
+import System.IO (Handle, hPutStrLn,
                   stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
@@ -101,7 +100,7 @@ newtype CGIT m a = CGIT { unCGIT :: StateT CGIState m a }
 type CGI a = CGIT IO a
 
 -- | The result of a CGI program.
-data CGIResult = CGIOutput String
+data CGIResult = CGIOutput FastString
                | CGIRedirect String
                  deriving (Show, Read, Eq, Ord)
 
@@ -150,7 +149,7 @@ hRunCGI :: MonadIO m =>
 hRunCGI hin hout f = do env <- liftIO getCgiVars
                         inp <- liftIO $ FPS.hGetContents hin
                         outp <- runCGIEnvFPS env inp f
-                        liftIO $ hPutStr hout outp
+                        liftIO $ FPS.hPut hout outp
                         liftIO $ hFlush hout
 
 -- | Run a CGI action in a given environment, using strings
@@ -162,7 +161,7 @@ runCGIEnv :: Monad m =>
           -> String -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
           -> m String -- ^ Response (headers and content).
-runCGIEnv vars inp f = runCGIEnvFPS vars (FPS.pack inp) f
+runCGIEnv vars inp f = liftM FPS.unpack $ runCGIEnvFPS vars (FPS.pack inp) f
 
 -- | Run a CGI action in a given environment, using a 'FastString'
 --   for input and a lazy string for output. 
@@ -170,7 +169,7 @@ runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
           -> FastString -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
-          -> m String -- ^ Response (headers and content).
+          -> m FastString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
     = do let s = CGIState {
                            cgiVars = Map.fromList vars,
@@ -182,14 +181,15 @@ runCGIEnvFPS vars inp f
          return $ case outp of
            CGIOutput str   -> formatResponse str hs'
                where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
-           CGIRedirect url -> formatResponse "" hs'
+           CGIRedirect url -> formatResponse FPS.empty hs'
                where hs' = tableSet "Location" url hs
 
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
 
-formatResponse :: String -> [(String,String)]-> String
-formatResponse c hs = unlinesS (map showHeader hs ++ [id, showString c]) ""
+formatResponse :: FastString -> [(String,String)]-> FastString
+formatResponse c hs = FPS.unlines (map showHeaderFPS hs ++ [FPS.empty, c])
+  where showHeaderFPS h = FPS.pack (showHeader h "")
 
 --
 -- * Logging and error handling
@@ -214,13 +214,21 @@ logCGI s = liftIO (hPutStrLn stderr s)
 -- * Output \/ redirect
 --
 
--- | Output a string. The output is assumed to be text\/html, encoded using
+-- | Output a 'String'. The output is assumed to be text\/html, encoded using
 --   ISO-8859-1. To change this, set the Content-type header using
 --   'setHeader'.
 output :: MonadCGI m =>
           String        -- ^ The string to output.
        -> m CGIResult
-output = return . CGIOutput
+output = return . CGIOutput . FPS.pack
+
+-- | Output a 'FastString'. The output is assumed to be text\/html, 
+--   encoded using ISO-8859-1. To change this, set the 
+--   Content-type header using 'setHeader'.
+outputFPS :: MonadCGI m =>
+             FastString        -- ^ The string to output.
+          -> m CGIResult
+outputFPS = return . CGIOutput
 
 -- | Redirect to some location.
 redirect :: MonadCGI m =>
@@ -399,15 +407,6 @@ tableAddIfNotPresent k v [] = [(k,v)]
 tableAddIfNotPresent k v ((k',v'):ts)
     | map toLower k == map toLower k' = (k',v') : ts
     | otherwise = (k',v') : tableAddIfNotPresent k v ts
-
-concatS :: [ShowS] -> ShowS
-concatS = foldr (.) id
-
-unlinesS :: [ShowS] -> ShowS
-unlinesS = join "\n"
-
-join :: String -> [ShowS] -> ShowS
-join glue = concatS . intersperse (showString glue)
 
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . reads
