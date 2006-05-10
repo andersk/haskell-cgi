@@ -14,7 +14,9 @@
 --
 -- TODO
 --
--- Add client side stuff (basically parsing Set-Cookie: value)
+-- * Add client side stuff (basically parsing Set-Cookie: value)
+--
+-- * Update for RFC2109 <http://www.ietf.org/rfc/rfc2109.txt>
 --
 -----------------------------------------------------------------------------
 module Network.HTTP.Cookie (
@@ -28,7 +30,6 @@ module Network.HTTP.Cookie (
 import Data.Char (toLower,isSpace)
 import Data.List (intersperse,find)
 import Data.Maybe (catMaybes)
-import Network.URI (escapeString, unEscapeString, reserved)
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import System.Time (CalendarTime(..), Month(..), Day(..),
                     formatCalendarTime)
@@ -138,19 +139,21 @@ deleteCookie c = c { cookieExpires = Just epoch }
 showCookie :: Cookie -> String
 showCookie c = concat $ intersperse "; " $
                 showPair (cookieName c) (cookieValue c)
-                 : catMaybes [expires, domain, path, secure]
+                 : catMaybes [expires, path, domain, secure]
     where expires = fmap (showPair "expires" . dateFmt) (cookieExpires c)
           domain = fmap (showPair "domain") (cookieDomain c)
           path = fmap (showPair "path") (cookiePath c)
           secure = if cookieSecure c then Just "secure" else Nothing
           dateFmt = formatCalendarTime defaultTimeLocale rfc822DateFormat
 
--- | Show a name-value pair. URI-escapes the name and value.
+-- | Show a name-value pair. FIXME: if the name or value
+--   contains semicolons, this breaks. The problem
+--   is that the original cookie spec does not mention
+--   how to do escaping or quoting. 
 showPair :: String -- ^ name
          -> String -- ^ value
          -> String
-showPair name value = escape name ++ "=" ++ escape value
-    where escape s = escapeString s (not . reserved)
+showPair name value = name ++ "=" ++ value
 
 
 -- | Gets all the cookies from a Cookie: header value
@@ -160,11 +163,11 @@ readCookies s = case parse parsePairs "" s of
                                            Left _ -> []
                                            Right ps -> ps
 
--- | Parse a semicolon-separated sequence of URI-escaped name=value pairs.
+-- | Parse a semicolon-separated sequence of name=value pairs.
 parsePairs :: Parser [(String,String)]
 parsePairs = sepBy parsePair (char ';' >> spaces)
 
--- | Parse a URI-escaped name=value pair
+-- | Parse a name=value pair
 parsePair :: Parser (String,String)
 parsePair = do
             spaces
@@ -173,7 +176,7 @@ parsePair = do
             char '='
             spaces
             value <- many (satisfy isAllowedChar)
-            return (unEscapeString name, unEscapeString value)
+            return (name, value)
 
 -- | Returns true if the character is allowed unescaped in
 --   (the HTTP representation of) cookie names and values.
