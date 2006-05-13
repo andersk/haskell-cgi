@@ -65,8 +65,8 @@ import System.IO (Handle, hPutStrLn,
                   stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
-import qualified Data.FastPackedString as FPS
-import Data.FastPackedString (FastString)
+import qualified Data.ByteString.Char8 as FPS
+import Data.ByteString.Char8 (ByteString)
 
 
 -- imports only needed by the compatibility functions
@@ -87,7 +87,7 @@ data CGIState = CGIState {
               deriving Show
 
 data Input = Input {
-                    value :: FastString,
+                    value :: ByteString,
                     filename :: Maybe String,
                     contentType :: ContentType
                    }
@@ -100,7 +100,7 @@ newtype CGIT m a = CGIT { unCGIT :: StateT CGIState m a }
 type CGI a = CGIT IO a
 
 -- | The result of a CGI program.
-data CGIResult = CGIOutput FastString
+data CGIResult = CGIOutput ByteString
                | CGIRedirect String
                  deriving (Show, Read, Eq, Ord)
 
@@ -167,9 +167,9 @@ runCGIEnv vars inp f = liftM FPS.unpack $ runCGIEnvFPS vars (FPS.pack inp) f
 --   for input and a lazy string for output. 
 runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
-          -> FastString -- ^ Request body.
+          -> ByteString -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
-          -> m FastString -- ^ Response (headers and content).
+          -> m ByteString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
     = do let s = CGIState {
                            cgiVars = Map.fromList vars,
@@ -187,7 +187,7 @@ runCGIEnvFPS vars inp f
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
 
-formatResponse :: FastString -> [(String,String)]-> FastString
+formatResponse :: ByteString -> [(String,String)]-> ByteString
 formatResponse c hs = FPS.unlines (map showHeaderFPS hs ++ [FPS.empty, c])
   where showHeaderFPS h = FPS.pack (showHeader h "")
 
@@ -222,11 +222,11 @@ output :: MonadCGI m =>
        -> m CGIResult
 output = return . CGIOutput . FPS.pack
 
--- | Output a 'FastString'. The output is assumed to be text\/html, 
+-- | Output a 'ByteString'. The output is assumed to be text\/html, 
 --   encoded using ISO-8859-1. To change this, set the 
 --   Content-type header using 'setHeader'.
 outputFPS :: MonadCGI m =>
-             FastString        -- ^ The string to output.
+             ByteString        -- ^ The string to output.
           -> m CGIResult
 outputFPS = return . CGIOutput
 
@@ -272,10 +272,10 @@ getInput :: MonadCGI m =>
                              --   or Nothing, if it was not set.
 getInput n = lift2M inputValue (getInput_ n)
 
--- | Like 'getInput', but returns a 'FastString'.
+-- | Like 'getInput', but returns a 'ByteString'.
 getInputFPS :: MonadCGI m =>
             String           -- ^ The name of the variable.
-         -> m (Maybe FastString) -- ^ The value of the variable,
+         -> m (Maybe ByteString) -- ^ The value of the variable,
                              --   or Nothing, if it was not set.
 getInputFPS n = lift2M value (getInput_ n)
 
@@ -479,7 +479,7 @@ cgiVarNames =
 -- | Get and decode the input according to the request
 --   method and the content-type.
 decodeInput :: [(String,String)] -- ^ CGI environment variables.
-            -> FastString        -- ^ Request body.
+            -> ByteString        -- ^ Request body.
             -> [(String,Input)]  -- ^ Input variables and values.
 decodeInput env inp = queryInput env ++ bodyInput env inp
 
@@ -526,7 +526,7 @@ urlDecode = unEscapeString . replace '+' ' '
 
 -- | Get input variables from the body, if any.
 bodyInput :: [(String,String)] -- ^ CGI environment variables.
-          -> FastString        -- ^ Request body.
+          -> ByteString        -- ^ Request body.
           -> [(String,Input)]  -- ^ Input variables and values.
 bodyInput env inp =
    case lookup "REQUEST_METHOD" env of
@@ -537,7 +537,7 @@ bodyInput env inp =
 
 -- | Decode a POST body.
 decodeBody :: Maybe ContentType -- ^ Content-type, if any
-           -> FastString        -- ^ Request body
+           -> ByteString        -- ^ Request body
            -> [(String,Input)]  -- ^ Input variables and values.
 decodeBody ctype inp = 
     case ctype of
@@ -551,8 +551,8 @@ decodeBody ctype inp =
 
 -- | Take the right number of bytes from the input.
 takeInput :: [(String,String)]  -- ^ CGI environment variables.
-          -> FastString             -- ^ Request body.
-          -> FastString             -- ^ CONTENT_LENGTH bytes from the request body,
+          -> ByteString             -- ^ Request body.
+          -> ByteString             -- ^ CONTENT_LENGTH bytes from the request body,
                                 --   or the empty string if there is no
                                 --   CONTENT_LENGTH.
 takeInput env req = 
@@ -563,7 +563,7 @@ takeInput env req =
 
 -- | Decode multipart\/form-data input.
 multipartDecode :: [(String,String)] -- ^ Content-type parameters
-                -> FastString        -- ^ Request body
+                -> ByteString        -- ^ Request body
                 -> [(String,Input)]  -- ^ Input variables and values.
 multipartDecode ps inp =
     case lookup "boundary" ps of
@@ -644,8 +644,8 @@ connectToCGIScript host portId
 -- | Returns the query string, or the request body if it is
 --   a POST request, or the empty string if there is an error.
 getRequestInput :: [(String,String)] -- ^ CGI environment variables.
-                -> FastString            -- ^ Request body.
-                -> FastString            -- ^ Query string.
+                -> ByteString            -- ^ Request body.
+                -> ByteString            -- ^ Query string.
 getRequestInput env req =
    case lookup "REQUEST_METHOD" env of
       Just "POST" -> takeInput env req
