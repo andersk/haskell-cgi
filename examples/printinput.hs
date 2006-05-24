@@ -8,6 +8,7 @@ module Main where
 import Network.NewCGI
 
 import Control.Monad (liftM)
+import Data.List (intersperse)
 import Data.Maybe (fromJust)
 
 printinput :: CGI CGIResult
@@ -23,12 +24,13 @@ printinput =
 prInput :: String -> CGI String
 prInput i = 
     do
-    v <- liftM fromJust (getInput i)
+    vs <- getMultiInput i
+    let v = concat $ intersperse "," $ map show vs
     f <- getInputFilename i
     return $ case f of
            Just n -> i ++ ": File\nfilename=" ++ n
                      ++ "\ncontents=" ++ v
-           Nothing -> i ++ ": " ++ v 
+           Nothing -> i ++ ": " ++ v
 
 prVars vs = unlines [k ++ ": " ++ x | (k,x) <- vs ]
 
