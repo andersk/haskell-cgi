@@ -33,7 +33,7 @@ module Network.NewCGI (
   -- * Logging
   , logCGI
   -- * Output
-  , output, outputFPS, redirect
+  , output, outputFPS, outputLazyFPS, redirect
   , setHeader
   -- * Input
   , getInput, getInputFPS, readInput
@@ -65,7 +65,8 @@ import System.IO (Handle, hPutStrLn,
                   stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
-import qualified Data.ByteString.Char8 as FPS
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as Lazy
 import Data.ByteString.Char8 (ByteString)
 
 
@@ -100,9 +101,10 @@ newtype CGIT m a = CGIT { unCGIT :: StateT CGIState m a }
 type CGI a = CGIT IO a
 
 -- | The result of a CGI program.
-data CGIResult = CGIOutput ByteString
+data CGIResult = CGIOutput (Either ByteString Lazy.ByteString)
                | CGIRedirect String
                  deriving (Show, Read, Eq, Ord)
+
 
 --
 -- * CGIT monad transformer
@@ -147,9 +149,9 @@ hRunCGI :: MonadIO m =>
         -> Handle -- ^ Handle that output will be written to.
         -> CGIT m CGIResult -> m ()
 hRunCGI hin hout f = do env <- liftIO getCgiVars
-                        inp <- liftIO $ FPS.hGetContents hin
+                        inp <- liftIO $ BS.hGetContents hin
                         outp <- runCGIEnvFPS env inp f
-                        liftIO $ FPS.hPut hout outp
+                        liftIO $ Lazy.hPut hout outp
                         liftIO $ hFlush hout
 
 -- | Run a CGI action in a given environment, using strings
@@ -161,7 +163,7 @@ runCGIEnv :: Monad m =>
           -> String -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
           -> m String -- ^ Response (headers and content).
-runCGIEnv vars inp f = liftM FPS.unpack $ runCGIEnvFPS vars (FPS.pack inp) f
+runCGIEnv vars inp f = liftM Lazy.unpack $ runCGIEnvFPS vars (BS.pack inp) f
 
 -- | Run a CGI action in a given environment, using a 'FastString'
 --   for input and a lazy string for output. 
@@ -169,7 +171,7 @@ runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
           -> ByteString -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
-          -> m ByteString -- ^ Response (headers and content).
+          -> m Lazy.ByteString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
     = do let s = CGIState {
                            cgiVars = Map.fromList vars,
@@ -179,17 +181,19 @@ runCGIEnvFPS vars inp f
          (outp,s') <- runStateT (unCGIT f) s
          let hs = cgiResponseHeaders s'
          return $ case outp of
-           CGIOutput str   -> formatResponse str hs'
+           CGIOutput x -> case x of
+                          Left str  -> formatResponse (Lazy.LPS [str]) hs'
+                          Right str -> formatResponse str hs'
                where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
-           CGIRedirect url -> formatResponse FPS.empty hs'
+           CGIRedirect url -> formatResponse Lazy.empty hs'
                where hs' = tableSet "Location" url hs
 
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
 
-formatResponse :: ByteString -> [(String,String)]-> ByteString
-formatResponse c hs = FPS.unlines (map showHeaderFPS hs ++ [FPS.empty, c])
-  where showHeaderFPS h = FPS.pack (showHeader h "")
+formatResponse :: Lazy.ByteString -> [(String,String)]-> Lazy.ByteString
+formatResponse c hs = Lazy.unlines (map showHeaderFPS hs ++ [Lazy.empty, c])
+  where showHeaderFPS h = Lazy.pack (showHeader h "")
 
 --
 -- * Logging and error handling
@@ -220,7 +224,7 @@ logCGI s = liftIO (hPutStrLn stderr s)
 output :: MonadCGI m =>
           String        -- ^ The string to output.
        -> m CGIResult
-output = return . CGIOutput . FPS.pack
+output = return . CGIOutput . Left . BS.pack
 
 -- | Output a 'ByteString'. The output is assumed to be text\/html, 
 --   encoded using ISO-8859-1. To change this, set the 
@@ -228,7 +232,12 @@ output = return . CGIOutput . FPS.pack
 outputFPS :: MonadCGI m =>
              ByteString        -- ^ The string to output.
           -> m CGIResult
-outputFPS = return . CGIOutput
+outputFPS = return . CGIOutput . Left
+
+outputLazyFPS :: MonadCGI m =>
+                 Lazy.ByteString
+              -> m CGIResult
+outputLazyFPS = return . CGIOutput . Right
 
 -- | Redirect to some location.
 redirect :: MonadCGI m =>
@@ -259,7 +268,7 @@ getVars = liftM Map.toList $ cgiGet cgiVars
 
 -- | Get the value of an input as a 'String'.
 inputValue :: Input -> String
-inputValue = FPS.unpack . value
+inputValue = BS.unpack . value
 
 -- | Get the value of an input variable, for example from a form.
 --   If the variable has multiple values, the first one is returned.
@@ -485,7 +494,7 @@ decodeInput env inp = queryInput env ++ bodyInput env inp
 
 -- | Build an 'Input' object for a simple value.
 simpleInput :: String -> Input
-simpleInput v = Input { value = FPS.pack v,
+simpleInput v = Input { value = BS.pack v,
                         filename = Nothing,
                         contentType = defaultInputType }
 
@@ -542,12 +551,12 @@ decodeBody :: Maybe ContentType -- ^ Content-type, if any
 decodeBody ctype inp = 
     case ctype of
                Just (ContentType "application" "x-www-form-urlencoded" _) 
-                   -> formInput (FPS.unpack inp)
+                   -> formInput (BS.unpack inp)
                Just (ContentType "multipart" "form-data" ps) 
                    -> multipartDecode ps inp
                Just _ -> [] -- FIXME: report that we don't handle this content type
                -- No content-type given, assume x-www-form-urlencoded
-               Nothing -> formInput (FPS.unpack inp)
+               Nothing -> formInput (BS.unpack inp)
 
 -- | Take the right number of bytes from the input.
 takeInput :: [(String,String)]  -- ^ CGI environment variables.
@@ -557,8 +566,8 @@ takeInput :: [(String,String)]  -- ^ CGI environment variables.
                                 --   CONTENT_LENGTH.
 takeInput env req = 
     case len of
-           Just l  -> FPS.take l req
-           Nothing -> FPS.empty
+           Just l  -> BS.take l req
+           Nothing -> BS.empty
      where len = lookup "CONTENT_LENGTH" env >>= maybeRead
 
 -- | Decode multipart\/form-data input.
@@ -632,12 +641,12 @@ wrapCGI f = do
 connectToCGIScript :: String -> PortID -> IO ()
 connectToCGIScript host portId
      = do env <- getCgiVars
-          input <- FPS.hGetContents stdin
+          input <- BS.hGetContents stdin
           let str = getRequestInput env input
           h <- connectTo host portId
                  `Exception.catch`
                    (\ e -> abort "Cannot connect to CGI daemon." e)
-          FPS.hPut h str >> hPutStrLn h ""
+          BS.hPut h str >> hPutStrLn h ""
           (sendBack h `finally` hClose h)
                `Prelude.catch` (\e -> unless (isEOFError e) (ioError e))
 
@@ -649,7 +658,7 @@ getRequestInput :: [(String,String)] -- ^ CGI environment variables.
 getRequestInput env req =
    case lookup "REQUEST_METHOD" env of
       Just "POST" -> takeInput env req
-      _ -> FPS.pack $ lookupOrNil "QUERY_STRING" env
+      _ -> BS.pack $ lookupOrNil "QUERY_STRING" env
 
 abort :: String -> Exception -> IO a
 abort msg e =
