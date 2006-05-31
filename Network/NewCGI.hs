@@ -33,7 +33,7 @@ module Network.NewCGI (
   -- * Logging
   , logCGI
   -- * Output
-  , output, outputFPS, outputLazyFPS, redirect
+  , output, outputFPS, outputFile, redirect
   , setHeader
   -- * Input
   , getInput, getInputFPS, readInput
@@ -65,9 +65,8 @@ import System.IO (Handle, hPutStrLn,
                   stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy.Char8 as Lazy
-import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.ByteString.Lazy.Char8 (ByteString)
 
 
 -- imports only needed by the compatibility functions
@@ -101,7 +100,7 @@ newtype CGIT m a = CGIT { unCGIT :: StateT CGIState m a }
 type CGI a = CGIT IO a
 
 -- | The result of a CGI program.
-data CGIResult = CGIOutput (Either ByteString Lazy.ByteString)
+data CGIResult = CGIOutput ByteString
                | CGIRedirect String
                  deriving (Show, Read, Eq, Ord)
 
@@ -151,7 +150,7 @@ hRunCGI :: MonadIO m =>
 hRunCGI hin hout f = do env <- liftIO getCgiVars
                         inp <- liftIO $ BS.hGetContents hin
                         outp <- runCGIEnvFPS env inp f
-                        liftIO $ Lazy.hPut hout outp
+                        liftIO $ BS.hPut hout outp
                         liftIO $ hFlush hout
 
 -- | Run a CGI action in a given environment, using strings
@@ -163,7 +162,7 @@ runCGIEnv :: Monad m =>
           -> String -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
           -> m String -- ^ Response (headers and content).
-runCGIEnv vars inp f = liftM Lazy.unpack $ runCGIEnvFPS vars (BS.pack inp) f
+runCGIEnv vars inp f = liftM BS.unpack $ runCGIEnvFPS vars (BS.pack inp) f
 
 -- | Run a CGI action in a given environment, using a 'FastString'
 --   for input and a lazy string for output. 
@@ -171,7 +170,7 @@ runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
           -> ByteString -- ^ Request body.
           -> CGIT m CGIResult -- ^ CGI action.
-          -> m Lazy.ByteString -- ^ Response (headers and content).
+          -> m ByteString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
     = do let s = CGIState {
                            cgiVars = Map.fromList vars,
@@ -181,19 +180,18 @@ runCGIEnvFPS vars inp f
          (outp,s') <- runStateT (unCGIT f) s
          let hs = cgiResponseHeaders s'
          return $ case outp of
-           CGIOutput x -> case x of
-                          Left str  -> formatResponse (Lazy.LPS [str]) hs'
-                          Right str -> formatResponse str hs'
+           CGIOutput c ->  formatResponse c hs'
                where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
-           CGIRedirect url -> formatResponse Lazy.empty hs'
+           CGIRedirect url -> formatResponse BS.empty hs'
                where hs' = tableSet "Location" url hs
+
+formatResponse :: ByteString -> [(String,String)]-> ByteString
+formatResponse c hs = BS.unlines (map showHeaderFPS hs ++ [BS.empty, c])
+  where showHeaderFPS h = BS.pack (showHeader h "")
 
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
 
-formatResponse :: Lazy.ByteString -> [(String,String)]-> Lazy.ByteString
-formatResponse c hs = Lazy.unlines (map showHeaderFPS hs ++ [Lazy.empty, c])
-  where showHeaderFPS h = Lazy.pack (showHeader h "")
 
 --
 -- * Logging and error handling
@@ -224,7 +222,7 @@ logCGI s = liftIO (hPutStrLn stderr s)
 output :: MonadCGI m =>
           String        -- ^ The string to output.
        -> m CGIResult
-output = return . CGIOutput . Left . BS.pack
+output = return . CGIOutput . BS.pack
 
 -- | Output a 'ByteString'. The output is assumed to be text\/html, 
 --   encoded using ISO-8859-1. To change this, set the 
@@ -232,12 +230,15 @@ output = return . CGIOutput . Left . BS.pack
 outputFPS :: MonadCGI m =>
              ByteString        -- ^ The string to output.
           -> m CGIResult
-outputFPS = return . CGIOutput . Left
+outputFPS = return . CGIOutput
 
-outputLazyFPS :: MonadCGI m =>
-                 Lazy.ByteString
-              -> m CGIResult
-outputLazyFPS = return . CGIOutput . Right
+-- | Output the contents of a file lazily. The output is assumed to be text\/html, 
+--   encoded using ISO-8859-1. To change this, set the 
+--   Content-type header using 'setHeader'.
+outputFile :: (MonadIO m, MonadCGI m) =>
+              FilePath
+           -> m CGIResult
+outputFile f = liftIO (BS.readFile f) >>= outputFPS
 
 -- | Redirect to some location.
 redirect :: MonadCGI m =>

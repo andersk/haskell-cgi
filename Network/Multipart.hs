@@ -30,13 +30,14 @@ module Network.Multipart
     ) where
 
 import Control.Monad
+import Data.Int (Int64)
 import Data.Maybe
 import System.IO (Handle)
 
 import Network.RFC822Headers
 
-import qualified Data.ByteString.Char8 as FPS
-import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.ByteString.Lazy.Char8 (ByteString)
 
 --
 -- * Multi-part stuff.
@@ -53,7 +54,7 @@ parseMultipartBody :: String -- ^ Boundary
                    -> ByteString -> Maybe MultiPart
 parseMultipartBody b s = 
     do
-    ps <- splitParts (FPS.pack b) s
+    ps <- splitParts (BS.pack b) s
     liftM MultiPart $ mapM parseBodyPart ps
 
 -- | Read a multi-part message from a 'Handle'.
@@ -63,7 +64,7 @@ hGetMultipartBody :: String -- ^ Boundary
                   -> IO MultiPart
 hGetMultipartBody b h = 
     do
-    s <- FPS.hGetContents h
+    s <- BS.hGetContents h
     case parseMultipartBody b s of
         Nothing -> fail "Error parsing multi-part message"
         Just m  -> return m
@@ -74,7 +75,7 @@ parseBodyPart :: ByteString -> Maybe BodyPart
 parseBodyPart s =
     do
     (hdr,bdy) <- splitAtEmptyLine s
-    hs <- parseM p_fields "<input>" (FPS.unpack hdr)
+    hs <- parseM p_fields "<input>" (BS.unpack hdr)
     return $ BodyPart hs bdy
 
 --
@@ -112,13 +113,13 @@ splitAtBoundary :: ByteString -- ^ The boundary, without the initial dashes
                    --   Returns 'Nothing' if there is no boundary.
 splitAtBoundary b s = spl 0
   where
-  spl i = case findCRLF (FPS.drop i s) of
+  spl i = case findCRLF (BS.drop i s) of
               Nothing -> Nothing
               Just (j,l) | isBoundary b s2 -> Just (s1,d,s3)
                          | otherwise -> spl (i+j+l)
                   where 
-                  s1 = FPS.take (i+j) s
-                  s2 = FPS.drop (i+j+l) s
+                  s1 = BS.take (i+j) s
+                  s2 = BS.drop (i+j+l) s
                   (d,s3) = splitAtCRLF_ s2
 
 -- | Check whether a string starts with two dashes followed by
@@ -126,18 +127,18 @@ splitAtBoundary b s = spl 0
 isBoundary :: ByteString -- ^ The boundary, without the initial dashes
            -> ByteString
            -> Bool
-isBoundary b s = startsWithDashes s && b `FPS.isPrefixOf` FPS.drop 2 s
+isBoundary b s = startsWithDashes s && b `BS.isPrefixOf` BS.drop 2 s
 
 -- | Check whether a string for which 'isBoundary' returns true
 --   has two dashes after the boudary string.
 isClose :: ByteString -- ^ The boundary, without the initial dashes
         -> ByteString 
         -> Bool
-isClose b s = startsWithDashes (FPS.drop (2+FPS.length b) s)
+isClose b s = startsWithDashes (BS.drop (2+BS.length b) s)
 
 -- | Checks whether a string starts with two dashes.
 startsWithDashes :: ByteString -> Bool
-startsWithDashes s = FPS.pack "--" `FPS.isPrefixOf` s
+startsWithDashes s = BS.pack "--" `BS.isPrefixOf` s
 
 
 --
@@ -153,14 +154,14 @@ dropLine s = fmap snd (splitAtCRLF s)
 --   empty line is not included in the result.
 --   'Nothing' is returned if there is no empty line.
 splitAtEmptyLine :: ByteString -> Maybe (ByteString, ByteString)
-splitAtEmptyLine s | startsWithCRLF s = Just (FPS.empty, dropCRLF s)
+splitAtEmptyLine s | startsWithCRLF s = Just (BS.empty, dropCRLF s)
                    | otherwise = spl 0
   where
-  spl i = case findCRLF (FPS.drop i s) of
+  spl i = case findCRLF (BS.drop i s) of
               Nothing -> Nothing
               Just (j,l) | startsWithCRLF s2 -> Just (s1, dropCRLF s2)
                          | otherwise -> spl (i+j+l)
-                where (s1,s2) = FPS.splitAt (i+j+l) s
+                where (s1,s2) = BS.splitAt (i+j+l) s
 
 -- | Split a string at the first CRLF. The CRLF is not included
 --   in any of the returned strings.
@@ -169,40 +170,40 @@ splitAtCRLF :: ByteString -- ^ String to split.
             -- ^  Returns 'Nothing' if there is no CRLF.
 splitAtCRLF s = case findCRLF s of
                   Nothing -> Nothing
-                  Just (i,l) -> Just (s1, FPS.drop l s2)
-                      where (s1,s2) = FPS.splitAt i s
+                  Just (i,l) -> Just (s1, BS.drop l s2)
+                      where (s1,s2) = BS.splitAt i s
 
 -- | Like 'splitAtCRLF', but if no CRLF is found, the first
 --   result is the argument string, and the second result is empty.
 splitAtCRLF_ :: ByteString -> (ByteString,ByteString)
-splitAtCRLF_ s = fromMaybe (s,FPS.empty) (splitAtCRLF s)
+splitAtCRLF_ s = fromMaybe (s,BS.empty) (splitAtCRLF s)
 
 -- | Get the index and length of the first CRLF, if any.
 findCRLF :: ByteString -- ^ String to split.
-         -> Maybe (Int,Int)
+         -> Maybe (Int64,Int64)
 findCRLF s = 
     case findCRorLF s of
               Nothing -> Nothing
-              Just j | j == FPS.length s - 1 -> Just (j,1)
-              Just j -> case (FPS.index s j, FPS.index s (j+1)) of
+              Just j | j == BS.length s - 1 -> Just (j,1)
+              Just j -> case (BS.index s j, BS.index s (j+1)) of
                            ('\n','\r') -> Just (j,2)
                            ('\r','\n') -> Just (j,2)
                            _           -> Just (j,1)
 
-findCRorLF :: ByteString -> Maybe Int
-findCRorLF s = FPS.findIndex (\c -> c == '\n' || c == '\r') s
+findCRorLF :: ByteString -> Maybe Int64
+findCRorLF s = BS.findIndex (\c -> c == '\n' || c == '\r') s
 
 startsWithCRLF :: ByteString -> Bool
-startsWithCRLF s = not (FPS.null s) && (c == '\n' || c == '\r')
-  where c = FPS.index s 0
+startsWithCRLF s = not (BS.null s) && (c == '\n' || c == '\r')
+  where c = BS.index s 0
 
 -- | Drop an initial CRLF, if any. If the string is empty, 
 --   nothing is done. If the string does not start with CRLF,
 --   the first character is dropped.
 dropCRLF :: ByteString -> ByteString
-dropCRLF s | FPS.length s <= 1 = FPS.drop 1 s
-           | c0 == '\n' && c1 == '\r' = FPS.drop 2 s
-           | c0 == '\r' && c1 == '\n' = FPS.drop 2 s
-           | otherwise = FPS.drop 1 s
-  where c0 = FPS.index s 0
-        c1 = FPS.index s 1
+dropCRLF s | BS.length s <= 1 = BS.drop 1 s
+           | c0 == '\n' && c1 == '\r' = BS.drop 2 s
+           | c0 == '\r' && c1 == '\n' = BS.drop 2 s
+           | otherwise = BS.drop 1 s
+  where c0 = BS.index s 0
+        c1 = BS.index s 1
