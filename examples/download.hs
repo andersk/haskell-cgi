@@ -8,9 +8,6 @@
 --   demo purposes. Do not put it on a public web server.
 module Main where
 
-import Control.Monad (liftM)
-import Data.Maybe (fromJust)
-
 import Network.NewCGI
 
 download =
