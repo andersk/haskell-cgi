@@ -1,15 +1,24 @@
+-- | This program takes a boundary string and a file name as
+--   the command line arguments and parses the 
+--   contents of the file as multipart\/form-data. The bodies of
+--   all the message parts are printed to standard output.
+module Main where
+
 import Network.Multipart
+
+import Data.ByteString.Lazy as BS
 
 import System.IO
 import System.Environment
 
 readMultipart :: String -> Handle -> IO MultiPart
-readMultipart b h = do
-                    inp <- hGetContents h
-                    parseM (p_multipart_body b) "<input data>" inp
+readMultipart b h = do inp <- BS.hGetContents h
+                       case parseMultipartBody b inp of
+                         Just x -> return x
+                         Nothing -> fail "Couldn't parse input."
 
 savePart :: BodyPart -> IO ()
-savePart (BodyPart hs c) = putStr c
+savePart (BodyPart hs c) = BS.putStr c
 
 main :: IO ()
 main = do

@@ -61,7 +61,7 @@ import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import Network.URI (unEscapeString)
 import System.Environment (getEnv)
-import System.IO (Handle, hPutStrLn,
+import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
                   stdin, stdout, stderr, hFlush)
 
 import Network.Multipart
@@ -232,13 +232,22 @@ outputFPS :: MonadCGI m =>
           -> m CGIResult
 outputFPS = return . CGIOutput
 
--- | Output the contents of a file lazily. The output is assumed to be text\/html, 
---   encoded using ISO-8859-1. To change this, set the 
+-- | Output the contents of a file lazily. The output is assumed 
+--   to be text\/html, encoded using ISO-8859-1. To change this, set the 
 --   Content-type header using 'setHeader'.
+--   The file must be a regular file, since this function looks at its
+--   size to set the Content-length header. To output the contents of
+--   non-regular files, use 'outputFPS'. 
 outputFile :: (MonadIO m, MonadCGI m) =>
               FilePath
            -> m CGIResult
-outputFile f = liftIO (BS.readFile f) >>= outputFPS
+outputFile f = do (c,sz) <- liftIO $ contentsAndSize f
+                  setHeader "Content-length" (show sz)
+                  outputFPS c
+    where contentsAndSize x = do h <- openFile x ReadMode
+                                 sz <- hFileSize h
+                                 c <- BS.hGetContents h
+                                 return (c,sz)
 
 -- | Redirect to some location.
 redirect :: MonadCGI m =>
