@@ -1,4 +1,5 @@
-PROGS = upload.cgi download.cgi printinput.cgi redirect.cgi hello.cgi
+PROGS = upload.cgi download.cgi printinput.cgi redirect.cgi hello.cgi \
+        cookie.cgi
 
 GHCFLAGS = -package cgi -fwarn-unused-imports
 
