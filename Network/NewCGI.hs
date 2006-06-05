@@ -12,6 +12,8 @@
 -- Portability :  non-portable (uses Control.Monad.State)
 --
 -- Simple Library for writing CGI programs.
+-- See <http://hoohoo.ncsa.uiuc.edu/cgi/interface.html> for the
+-- CGI specification.
 --
 -- Based on the original Haskell binding for CGI:
 --
@@ -256,7 +258,7 @@ redirect :: MonadCGI m =>
 redirect = return . CGIRedirect
 
 --
--- * HTTP variables
+-- * Environment variables
 --
 
 -- | Get the value of a CGI environment variable. Example:
@@ -273,7 +275,7 @@ getVars :: MonadCGI m =>
 getVars = liftM Map.toList $ cgiGet cgiVars
 
 --
--- * Query input
+-- * Inputs
 --
 
 -- | Get the value of an input as a 'String'.
