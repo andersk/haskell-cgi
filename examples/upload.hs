@@ -5,6 +5,7 @@
 import Control.Monad (liftM)
 import Data.Maybe (fromJust)
 
+import qualified Data.ByteString.Lazy as BS
 import Network.NewCGI
 
 dir = "../upload"
@@ -16,9 +17,9 @@ cgiMain = do m <- getInputFilename "file"
 
 saveFile n =
     do
-    cont <- liftM fromJust $ getInput "file"
+    cont <- liftM fromJust $ getInputFPS "file"
     let p = dir ++ "/" ++ basename n
-    liftIO $ writeFile p cont
+    liftIO $ BS.writeFile p cont
     output $ "Saved as <a href='" ++ p ++ "'>" ++ p ++ "</a>."
 
 form = concat ["<html><body><form method='post' enctype='multipart/form-data'>",
