@@ -47,6 +47,8 @@ module Network.NewCGI (
   , Cookie(..), newCookie
   , getCookie, readCookie
   , setCookie, deleteCookie
+  -- * URL encoding
+  , formEncode, urlEncode, formDecode, urlDecode
   -- * Compatibility
   , Html, wrapper, pwrapper, connectToCGIScript
   ) where
@@ -56,12 +58,13 @@ import Control.Monad (liftM, unless)
 import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
 import Data.Char (toLower)
+import Data.List (intersperse)
 import Data.Maybe (listToMaybe, fromMaybe)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
-import Network.URI (unEscapeString)
+import Network.URI (unEscapeString,escapeURIString,isUnescapedInURI)
 import System.Environment (getEnv)
 import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
                   stdin, stdout, stderr, hFlush)
@@ -515,7 +518,7 @@ defaultInputType :: ContentType
 defaultInputType = ContentType "text" "plain" [] -- FIXME: use some default encoding?
 
 --
--- * Query string and x-www-form-urlencoded stuff
+-- * Query string
 --
 
 -- | Get inputs from the query string.
@@ -527,6 +530,22 @@ queryInput env = formInput $ lookupOrNil "QUERY_STRING" env
 formInput :: String
           -> [(String,Input)] -- ^ Input variables and values.
 formInput qs = [(n, simpleInput v) | (n,v) <- formDecode qs]
+
+--
+-- * URL encoding
+--
+
+-- | Format name-value pairs as application\/x-www-form-urlencoded.
+formEncode :: [(String,String)] -> String
+formEncode xs = 
+    concat $ intersperse "&" [urlEncode n ++ "=" ++ urlEncode v | (n,v) <- xs]
+
+-- | Convert a single value to the application\/x-www-form-urlencoded encoding.
+urlEncode :: String -> String
+urlEncode = replace ' ' '+' . escapeURIString okChar
+  where okChar c = c == ' ' || 
+                   (isUnescapedInURI c && c `notElem` "&=+")
+
 
 -- | Get the name-value pairs from application\/x-www-form-urlencoded data.
 formDecode :: String -> [(String,String)]
