@@ -49,7 +49,7 @@ module Network.NewCGI (
   , setCookie, deleteCookie
   -- * URL encoding
   , formEncode, urlEncode, formDecode, urlDecode
-  -- * Compatibility
+  -- * Compatibility with the old API
   , Html, wrapper, pwrapper, connectToCGIScript
   ) where
 

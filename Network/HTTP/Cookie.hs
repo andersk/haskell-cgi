@@ -49,8 +49,8 @@ data Cookie = Cookie {
                       cookieValue :: String,
                       -- | Expiry date of the cookie. If 'Nothing', the
                       --   cookie expires when the browser sessions ends.
-                      --   If the date is in the psat, the client should
-                      --   delete cookie the cookie immediately.
+                      --   If the date is in the past, the client should
+                      --   delete the cookie immediately.
                       cookieExpires :: Maybe CalendarTime,
                       -- | The domain suffix to which this cookie will be sent.
                       cookieDomain :: Maybe String,
