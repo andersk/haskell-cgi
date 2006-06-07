@@ -26,15 +26,25 @@ import Text.XHtml
 -- * Error handling
 --
 
+-- | Catches any exception thrown by the given CGI action,
+--   and returns an error page for it. 
+--   
+--   Typical usage:
+--
+-- > cgiMain :: CGI CGIResult
+-- > cgiMain = ...
+-- >
+-- > main :: IO ()
+-- > main = runCGI (handleErrors cgiMain)
 handleErrors :: CGI CGIResult -> CGI CGIResult
-handleErrors x = catchCGI x outputException
+handleErrors = flip catchCGI outputException
 
 --
 -- * Error output
 --
 
 -- | Output a 500 Internal Server Error with information from
---   an Exception.
+--   an 'Exception'.
 outputException :: (MonadCGI m,MonadIO m) => Exception -> m CGIResult
 outputException e = 
     case e of
