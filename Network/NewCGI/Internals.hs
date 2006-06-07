@@ -108,6 +108,9 @@ instance Monad m => Monad (CGIT m) where
 instance MonadIO m => MonadIO (CGIT m) where
     liftIO f = CGIT (liftIO f)
 
+-- | The class of CGI monads. Most CGI actions can be run in
+--   any monad which is an instance of this class, which means that
+--   you can use your own monad transformers to add extra functionality.
 class Monad m => MonadCGI m where
     -- | Modify the CGIT state.
     cgiModify :: (CGIState -> CGIState) -> m ()
@@ -208,6 +211,7 @@ tryCGI (CGIT c) = CGIT (StateT (\s -> f s (runStateT c s)))
       f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
 
 {-# DEPRECATED handleExceptionCGI "Use catchCGI instead." #-}
+-- | Deprecated version of 'catchCGI'. Use 'catchCGI' instead.
 handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
 handleExceptionCGI = catchCGI
 

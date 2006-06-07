@@ -26,8 +26,8 @@
 -----------------------------------------------------------------------------
 
 module Network.NewCGI (
-  -- * The CGI monad
-    MonadCGI(..), CGIT, CGIResult, CGI
+  -- * CGI monad
+    MonadCGI, CGIT, CGIResult, CGI
   , MonadIO, liftIO
   , runCGI
   -- * Error handling
