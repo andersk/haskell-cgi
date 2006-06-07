@@ -23,7 +23,6 @@ Description:
    Network.CGI module.
 Exposed-Modules: 
    Network.NewCGI,
-   Network.NewCGI.Error,
    Network.NewCGI.Internals,
    Network.NewCGI.Trans,
    Network.Multipart,

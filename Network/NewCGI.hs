@@ -32,11 +32,15 @@ module Network.NewCGI (
   , runCGI
   -- * Error handling
   , catchCGI, tryCGI, handleExceptionCGI
+  , handleErrors
   -- * Logging
   , logCGI
   -- * Output
   , output, outputFPS, outputFile, redirect
   , setHeader
+  -- * Error pages
+  , outputError 
+  , outputNotFound, outputMethodNotAllowed, outputInternalServerError
   -- * Input
   , getInput, getInputFPS, readInput
   , getInputs, getInputNames
@@ -53,8 +57,10 @@ module Network.NewCGI (
   , Html, wrapper, pwrapper, connectToCGIScript
   ) where
 
+import Control.Exception (Exception(..))
 import Control.Monad (liftM, unless)
 import Control.Monad.Trans (MonadIO, liftIO)
+import Data.List (intersperse)
 import Data.Maybe (listToMaybe)
 import qualified Data.Map as Map
 import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
@@ -74,7 +80,8 @@ import Network (PortID, Socket, listenOn, connectTo)
 import Network.Socket as Socket (SockAddr(SockAddrInet), accept, socketToHandle)
 import System.IO (hGetLine, hClose, IOMode(ReadWriteMode))
 import System.IO.Error (isEOFError)
-import Text.XHtml (Html, renderHtml)
+import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++), 
+                   body, h1, paragraph, hr)
 
 
 -- | Run a CGI action. Typically called by the main function.
@@ -126,6 +133,87 @@ redirect :: MonadCGI m =>
             String        -- ^ A URL to redirect to.
          -> m CGIResult
 redirect = return . CGIRedirect
+
+
+--
+-- * Error handling
+--
+
+-- | Catches any exception thrown by the given CGI action,
+--   returns an error page with a 500 Internal Server Error,
+--   showing the exception information, and logs the error.
+--   
+--   Typical usage:
+--
+-- > cgiMain :: CGI CGIResult
+-- > cgiMain = ...
+-- >
+-- > main :: IO ()
+-- > main = runCGI (handleErrors cgiMain)
+handleErrors :: CGI CGIResult -> CGI CGIResult
+handleErrors = flip catchCGI outputException
+
+--
+-- * Error output
+--
+
+-- | Output a 500 Internal Server Error with information from
+--   an 'Exception'.
+outputException :: (MonadCGI m,MonadIO m) => Exception -> m CGIResult
+outputException e = 
+    outputInternalServerError $ case e of
+                                  ErrorCall msg -> msg
+                                  _             -> show e
+
+-- | Output an error page to the user, with the given
+--   HTTP status code in the response. Also logs the error information
+--   using 'logCGI'.
+outputError :: (MonadCGI m, MonadIO m) =>
+               Int      -- ^ HTTP Status code
+            -> String   -- ^ Status message
+            -> [String] -- ^ Error information
+            -> m CGIResult
+outputError c m es = 
+      do logCGI $ show (c,m,es)
+         setHeader "Status" (show c)
+         output $ renderHtml $ errorPage c m es 
+
+-- | Create an HTML error page.
+errorPage :: Int      -- ^ Status code
+          -> String   -- ^ Status message
+          -> [String] -- ^ Error information
+          -> Html
+errorPage c m es = header << thetitle << tit 
+                   +++ body << (h1 << tit +++ map (paragraph <<) es 
+                                +++ hr +++ paragraph << sig)
+    where tit = show c ++ " " ++ m
+          sig = "Network.NewCGI/X.X" -- FIXME: get from somewhere
+
+--
+-- * Specific HTTP errors
+--
+
+-- | Use 'outputError' to output and log a 404 Not Found error.
+outputNotFound :: (MonadIO m, MonadCGI m) => 
+                 String -- ^ The name of the requested resource.
+              -> m CGIResult
+outputNotFound r =
+    outputError 404 "Not Found" ["The requested resource was not found: " ++ r]
+
+-- | Use 'outputError' to output and log a 405 Method Not Allowed error.
+outputMethodNotAllowed :: (MonadIO m, MonadCGI m) => 
+                          [String] -- ^ The allowed methods.
+                       -> m CGIResult
+outputMethodNotAllowed ms = 
+    do let allow = concat $ intersperse ", " ms
+       setHeader "Allow" allow
+       outputError 405 "Method Not Allowed" ["Allowed methods : " ++ allow]
+
+-- | Use 'outputError' to output and log a 500 Internal Server Error.
+outputInternalServerError :: (MonadIO m, MonadCGI m) =>
+                             String -- ^ Error message.
+                          -> m CGIResult
+outputInternalServerError e = outputError 500 "Internal Server Error" [e]
 
 
 --
