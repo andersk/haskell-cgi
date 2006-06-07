@@ -23,7 +23,8 @@
 -- A new, hopefully more flexible, interface
 -- and support for file uploads by Bjorn Bringert <mailto:bjorn@bringert.net>.
 --
--- Here is a simple example, including error handling:
+-- Here is a simple example, including error handling (not that there is 
+-- much that can go wrong with Hello World):
 --
 -- > import Network.NewCGI
 -- >
