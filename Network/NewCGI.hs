@@ -29,7 +29,7 @@ module Network.NewCGI (
   -- * The CGI monad
     MonadCGI(..), CGIT, CGIResult, CGI
   , MonadIO, liftIO
-  , runCGI,
+  , runCGI
   -- * Error handling
   , failCGI, catchCGI, tryCGI, handleExceptionCGI
   -- * Logging
