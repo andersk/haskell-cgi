@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fglasgow-exts #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.NewCGI.Internals
@@ -17,10 +18,10 @@
 
 module Network.NewCGI.Internals (
     MonadCGI(..), CGIState(..), CGIT(..), CGIResult(..), CGI
-  , Input(..), HeaderName(..),
+  , Input(..), HeaderName(..), CGIException(..)
   , hRunCGI, runCGIEnv, runCGIEnvFPS
   -- * Error handling
-  , handleExceptionCGI
+  , failCGI, catchCGI, tryCGI, handleExceptionCGI
   -- * Logging
   , logCGI
   -- * Environment variables
@@ -33,10 +34,11 @@ module Network.NewCGI.Internals (
   , maybeRead
  ) where
 
-import Control.Exception as Exception (Exception,try)
+import Control.Exception as Exception (Exception, try, throwDyn)
 import Control.Monad (liftM)
 import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
+import Data.Typeable (Typeable)
 import Data.Char (toLower)
 import Data.List (intersperse)
 import qualified Data.Map as Map
@@ -177,16 +179,41 @@ defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
 
 --
--- * Logging and error handling
+-- * Error handling
 --
 
--- | Handle an exception.
---   FIXME: could this be generalized?
+-- | The type of exceptions thrown by 'failCGI'.
+data CGIException = CGIException Int String [String]
+                  deriving (Typeable, Show)
+
+-- | Throw a CGI exception. This can be used instead of 'fail' to
+--   give more control over the error message seen by the user. 
+--   This function uses 'throwDyn' to throw a 'CGIException'.
+failCGI :: Int -- ^ HTTP status code.
+        -> String -- ^ HTTP status message.
+        -> [String] -- ^ Additional error information.
+        -> a
+failCGI c m es = throwDyn (CGIException c m es)
+
+-- | Catches any expection thrown by a CGI action, and uses the given 
+--   exception handler if an exception is thrown.
+catchCGI :: CGI a -> (Exception -> CGI a) -> CGI a
+catchCGI c h = tryCGI c >>= either h return
+
+-- | Catches any exception thrown by an CGI action, and returns either
+--   the exception, or if no exception was raised, the result of the action.
+tryCGI :: CGI a -> CGI (Either Exception a)
+tryCGI (CGIT c) = CGIT (StateT (\s -> f s (runStateT c s)))
+    where
+      f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
+
+{-# DEPRECATED handleExceptionCGI "Use catchCGI instead." #-}
 handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
-handleExceptionCGI (CGIT c) h = 
-    CGIT (StateT (\s -> f s (runStateT c s))) >>= either h return
-  where 
-  f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
+handleExceptionCGI = catchCGI
+
+--
+-- * Logging
+--
 
 -- | Log some message using the server\'s logging facility.
 -- FIXME: does this have to be more general to support
