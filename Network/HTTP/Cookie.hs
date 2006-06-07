@@ -20,15 +20,14 @@
 --
 -----------------------------------------------------------------------------
 module Network.HTTP.Cookie (
-                            Headers, Cookie(..)
+                            Cookie(..)
                             , newCookie
-                            , getCookie, setCookie
                             , findCookie, deleteCookie
                             , showCookie, readCookies
                            ) where
 
-import Data.Char (toLower,isSpace)
-import Data.List (intersperse,find)
+import Data.Char (isSpace)
+import Data.List (intersperse)
 import Data.Maybe (catMaybes)
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import System.Time (CalendarTime(..), Month(..), Day(..),
@@ -38,8 +37,6 @@ import Text.ParserCombinators.Parsec
 --
 -- * Types
 --
-
-type Headers = [(String,String)]
 
 -- | Contains all information about a cookie set by the server.
 data Cookie = Cookie {
@@ -85,13 +82,6 @@ newCookie name value = Cookie { cookieName = name,
 -- * Getting and setting cookies
 --
 
--- | Get the value of a cookie from HTTP request headers
-getCookie :: Headers
-          -> String       -- ^ Cookie name
-          -> Maybe String -- ^ Cookie value
-getCookie hs name =
-    find (equalsIgnoreCase "Cookie" . fst) hs >>= findCookie name . snd
-
 -- | Get the value of a cookie from a semicolon separated list of
 --   name-value pairs such as that in the value of the Cookie: header
 --   or the HTTP_COOKIE CGI variable.
@@ -99,15 +89,6 @@ findCookie :: String -- ^ Cookie name
            -> String -- ^ Semicolon separated list of name-value pairs
            -> Maybe String  -- ^ Cookie value, if found
 findCookie name s = maybeLast [ cv | (cn,cv) <- readCookies s, cn == name ]
-
--- | Set a cookie in HTTP response headers.
-setCookie :: Cookie
-          -> Headers
-          -> Headers
--- The cookie is just added to the end of the headers,
--- since the last instance of a cookie overrides earlier ones.
-setCookie c hs = hs ++ [("Set-Cookie", showCookie c)]
-
 
 -- | Delete a cookie from the client by setting the cookie expiry date
 --   to a date in the past.
@@ -191,10 +172,6 @@ isAllowedChar _ = True
 --
 -- Utilities
 --
-
--- | Compare two strings for equality, ignoring case.
-equalsIgnoreCase :: String -> String -> Bool
-equalsIgnoreCase x y = map toLower x == map toLower y
 
 -- | Return 'Nothing' is the list is empty, otherwise return
 --   the last element of the list.

@@ -53,21 +53,18 @@ module Network.NewCGI (
   , Html, wrapper, pwrapper, connectToCGIScript
   ) where
 
-import Control.Exception as Exception (try)
 import Control.Monad (liftM, unless)
-import Control.Monad.State
-import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
-import Data.Maybe (listToMaybe, fromMaybe)
+import Control.Monad.Trans (MonadIO, liftIO)
+import Data.Maybe (listToMaybe)
 import qualified Data.Map as Map
-import Data.Map (Map)
-import Network.HTTP.Cookie (Cookie(..), newCookie, findCookie)
-import qualified Network.HTTP.Cookie as Cookie (setCookie, deleteCookie)
 import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
-                  stdin, stdout, stderr, hFlush)
+                  stdin, stdout)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
 
+import Network.HTTP.Cookie (Cookie(..), showCookie, newCookie, findCookie)
+import qualified Network.HTTP.Cookie as Cookie (deleteCookie)
 import Network.NewCGI.Internals
 
 -- imports only needed by the compatibility functions
@@ -86,24 +83,6 @@ import Text.Html (Html, renderHtml)
 runCGI :: MonadIO m => CGIT m CGIResult -> m ()
 runCGI = hRunCGI stdin stdout
 
---
--- * Logging and error handling
---
-
--- | Handle an exception.
---   FIXME: could this be generalized?
-handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
-handleExceptionCGI (CGIT c) h = 
-    CGIT (StateT (\s -> f s (runStateT c s))) >>= either h return
-  where 
-  f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
-
--- | Log some message using the server\'s logging facility.
--- FIXME: does this have to be more general to support
--- FastCGI etc? Maybe we should store log messages in the
--- CGIState?
-logCGI :: (MonadCGI m, MonadIO m) => String -> m ()
-logCGI s = liftIO (hPutStrLn stderr s)
 
 --
 -- * Output \/ redirect
@@ -148,6 +127,7 @@ redirect :: MonadCGI m =>
          -> m CGIResult
 redirect = return . CGIRedirect
 
+
 --
 -- * Environment variables
 --
@@ -158,20 +138,17 @@ redirect = return . CGIRedirect
 getVar :: MonadCGI m =>
           String             -- ^ The name of the variable.
        -> m (Maybe String)
-getVar name = liftM (lookup name) getVars
+getVar name = liftM (Map.lookup name) $ cgiGet cgiVars
 
 -- | Get all CGI environment variables and their values.
 getVars :: MonadCGI m =>
            m [(String,String)]
 getVars = liftM Map.toList $ cgiGet cgiVars
 
+
 --
 -- * Inputs
 --
-
--- | Get the value of an input as a 'String'.
-inputValue :: Input -> String
-inputValue = BS.unpack . value
 
 -- | Get the value of an input variable, for example from a form.
 --   If the variable has multiple values, the first one is returned.
@@ -211,10 +188,6 @@ getInputFilename :: MonadCGI m =>
                                      -- input, if there is one.
 getInputFilename = liftM (>>= filename) . getInput_
 
-getInput_ ::  MonadCGI m => String -> m (Maybe Input)
-getInput_ n = 
-    (maybe Nothing listToMaybe . Map.lookup n) `liftM` cgiGet cgiInput
-
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: (Read a, MonadCGI m) =>
              String        -- ^ The name of the variable.
@@ -233,6 +206,16 @@ getInputs = (f . Map.toList) `liftM` cgiGet cgiInput
 -- | Get the names of all input variables.
 getInputNames :: MonadCGI m => m [String]
 getInputNames = Map.keys `liftM` cgiGet cgiInput
+
+-- Internal stuff
+
+inputValue :: Input -> String
+inputValue = BS.unpack . value
+
+getInput_ ::  MonadCGI m => String -> m (Maybe Input)
+getInput_ n = 
+    (maybe Nothing listToMaybe . Map.lookup n) `liftM` cgiGet cgiInput
+
 
 --
 -- * Cookies
@@ -254,7 +237,7 @@ readCookie = liftM (>>= maybeRead) . getCookie
 
 -- | Set a cookie.
 setCookie :: MonadCGI m => Cookie -> m ()
-setCookie = modifyHeaders . Cookie.setCookie
+setCookie = setHeader "Set-cookie" . showCookie
 
 -- | Delete a cookie from the client
 deleteCookie :: MonadCGI m => Cookie -> m ()
@@ -273,11 +256,8 @@ setHeader :: MonadCGI m =>
              String -- ^ Header name.
           -> String -- ^ Header value.
           -> m ()
-setHeader n v = modifyHeaders (tableSet n v)
-
-
-
-
+setHeader n v = cgiModify (\s -> s { cgiHeaders = f (cgiHeaders s) })
+    where f = Map.insert (HeaderName n) v
 
 
 --
@@ -325,7 +305,7 @@ wrapCGI f = do
 -- | Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
 connectToCGIScript :: String -> PortID -> IO ()
 connectToCGIScript host portId
-     = do env <- getCgiVars
+     = do env <- getCGIVars
           input <- BS.hGetContents stdin
           let str = getRequestInput env input
           h <- connectTo host portId

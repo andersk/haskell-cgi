@@ -16,20 +16,24 @@
 -----------------------------------------------------------------------------
 
 module Network.NewCGI.Internals (
-    MonadCGI (..), CGIState (..), CGIT (..), CGIResult(..), CGI, Input(..)
+    MonadCGI(..), CGIState(..), CGIT(..), CGIResult(..), CGI
+  , Input(..), HeaderName(..),
   , hRunCGI, runCGIEnv, runCGIEnvFPS
-  -- * Response headers
-  , modifyHeaders
+  -- * Error handling
+  , handleExceptionCGI
+  -- * Logging
+  , logCGI
   -- * Environment variables
-  , getCgiVars
+  , getCGIVars
   -- * Inputs
   , takeInput
   -- * URL encoding
   , formEncode, urlEncode, formDecode, urlDecode
   -- * Utilities
-  , tableSet, maybeRead
+  , maybeRead
  ) where
 
+import Control.Exception as Exception (Exception,try)
 import Control.Monad (liftM)
 import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
@@ -47,13 +51,27 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Network.Multipart
 
+-- | The state ept in the CGIT monad transformer.
 data CGIState = CGIState {
+                          -- | Environment variables.
                           cgiVars :: Map String String,
+                          -- | Input parameters.
                           cgiInput :: Map String [Input],
-                          cgiResponseHeaders :: [(String,String)]
+                          -- | Response headers.
+                          cgiHeaders :: Map HeaderName String
                          }
               deriving Show
 
+-- | A string with case insensitive equality and comparisons.
+newtype HeaderName = HeaderName String deriving (Show)
+
+instance Eq HeaderName where
+    HeaderName x == HeaderName y = map toLower x == map toLower y
+
+instance Ord HeaderName where
+    HeaderName x `compare` HeaderName y = map toLower x `compare` map toLower y
+
+-- | The value of an input parameter, and some metadata.
 data Input = Input {
                     value :: ByteString,
                     filename :: Maybe String,
@@ -111,7 +129,7 @@ hRunCGI :: MonadIO m =>
            Handle -- ^ Handle that input will be read from.
         -> Handle -- ^ Handle that output will be written to.
         -> CGIT m CGIResult -> m ()
-hRunCGI hin hout f = do env <- liftIO getCgiVars
+hRunCGI hin hout f = do env <- liftIO getCGIVars
                         inp <- liftIO $ BS.hGetContents hin
                         outp <- runCGIEnvFPS env inp f
                         liftIO $ BS.hPut hout outp
@@ -139,39 +157,50 @@ runCGIEnvFPS vars inp f
     = do let s = CGIState {
                            cgiVars = Map.fromList vars,
                            cgiInput = mkMultiMap $ decodeInput vars inp,
-                           cgiResponseHeaders = []
+                           cgiHeaders = Map.empty
                           }
          (outp,s') <- runStateT (unCGIT f) s
-         let hs = cgiResponseHeaders s'
+         let hs = cgiHeaders s'
          return $ case outp of
            CGIOutput c ->  formatResponse c hs'
-               where hs' = tableAddIfNotPresent "Content-type" defaultContentType hs
+               where hs' = Map.insertWith (\_ o -> o) 
+                             (HeaderName "Content-type") defaultContentType hs
            CGIRedirect url -> formatResponse BS.empty hs'
-               where hs' = tableSet "Location" url hs
+               where hs' = Map.insert (HeaderName "Location") url hs
 
-formatResponse :: ByteString -> [(String,String)]-> ByteString
-formatResponse c hs = BS.unlines (map showHeaderFPS hs ++ [BS.empty, c])
-  where showHeaderFPS h = BS.pack (showHeader h "")
+formatResponse :: ByteString -> Map HeaderName String -> ByteString
+formatResponse c hs = 
+    BS.unlines ([BS.pack (n++": "++v) | (HeaderName n,v) <- Map.toList hs] 
+                ++ [BS.empty,c])
 
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
 
--- | Modify the response headers.
-modifyHeaders :: MonadCGI m =>
-                 ([(String,String)] -> [(String,String)])
-              -> m ()
-modifyHeaders f = cgiModify (\s -> s{cgiResponseHeaders 
-                                     = f (cgiResponseHeaders s)})
+--
+-- * Logging and error handling
+--
 
-showHeader :: (String,String) -> ShowS
-showHeader (n,v) = showString n . showString ": " . showString v
+-- | Handle an exception.
+--   FIXME: could this be generalized?
+handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
+handleExceptionCGI (CGIT c) h = 
+    CGIT (StateT (\s -> f s (runStateT c s))) >>= either h return
+  where 
+  f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
+
+-- | Log some message using the server\'s logging facility.
+-- FIXME: does this have to be more general to support
+-- FastCGI etc? Maybe we should store log messages in the
+-- CGIState?
+logCGI :: (MonadCGI m, MonadIO m) => String -> m ()
+logCGI s = liftIO (hPutStrLn stderr s)
 
 --
 -- * Environment variables
 --
 
-getCgiVars :: IO [(String,String)]
-getCgiVars = mapM (\n -> (,) n `liftM` getEnvOrNil n) cgiVarNames
+getCGIVars :: IO [(String,String)]
+getCGIVars = mapM (\n -> (,) n `liftM` getEnvOrNil n) cgiVarNames
 
 cgiVarNames :: [String]
 cgiVarNames =
@@ -336,8 +365,6 @@ bodyPartToInput (BodyPart hs b) =
     where ctype = fromMaybe defaultInputType (getContentType hs)
 
 
-
-
 --
 -- * Utilities
 --
@@ -353,28 +380,8 @@ replace :: Eq a =>
         -> [a] -- ^ Output list
 replace x y = map (\z -> if z == x then y else z)
 
--- | Set a value in a lookup table with case-insensitive 
---   key comparison.
-tableSet :: String -> b -> [(String,b)] -> [(String,b)]
-tableSet k v [] = [(k,v)]
-tableSet k v ((k',v'):ts)
-    | map toLower k == map toLower k' = (k,v) : ts
-    | otherwise = (k',v') : tableSet k v ts
-
--- | Add a key, value pair to a table only if there is no entry
---   with the given key already in the table. If there is an entry
---   already, nothing is done. Case-insensitive key comparison.
-tableAddIfNotPresent :: String -> b -> [(String,b)] -> [(String,b)]
-tableAddIfNotPresent k v [] = [(k,v)]
-tableAddIfNotPresent k v ((k',v'):ts)
-    | map toLower k == map toLower k' = (k',v') : ts
-    | otherwise = (k',v') : tableAddIfNotPresent k v ts
-
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . reads
-
-inside :: (Monad m, Monad n) => (a -> n b) -> m (n a) -> m (n b)
-inside = liftM . (=<<)
 
 -- | Get the value of an environment variable, or
 --   the empty string of the variable is not set.
