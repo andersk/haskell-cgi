@@ -18,10 +18,10 @@
 
 module Network.NewCGI.Internals (
     MonadCGI(..), CGIState(..), CGIT(..), CGIResult(..), CGI
-  , Input(..), HeaderName(..), CGIException(..)
+  , Input(..), HeaderName(..)
   , hRunCGI, runCGIEnv, runCGIEnvFPS
   -- * Error handling
-  , failCGI, catchCGI, tryCGI, handleExceptionCGI
+  , catchCGI, tryCGI, handleExceptionCGI
   -- * Logging
   , logCGI
   -- * Environment variables
@@ -34,11 +34,10 @@ module Network.NewCGI.Internals (
   , maybeRead
  ) where
 
-import Control.Exception as Exception (Exception, try, throwDyn)
+import Control.Exception as Exception (Exception, try)
 import Control.Monad (liftM)
 import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
-import Data.Typeable (Typeable)
 import Data.Char (toLower)
 import Data.List (intersperse)
 import qualified Data.Map as Map
@@ -184,19 +183,6 @@ defaultContentType = "text/html; charset=ISO-8859-1"
 --
 -- * Error handling
 --
-
--- | The type of exceptions thrown by 'failCGI'.
-data CGIException = CGIException Int String [String]
-                  deriving (Typeable, Show)
-
--- | Throw a CGI exception. This can be used instead of 'fail' to
---   give more control over the error message seen by the user. 
---   This function uses 'throwDyn' to throw a 'CGIException'.
-failCGI :: Int -- ^ HTTP status code.
-        -> String -- ^ HTTP status message.
-        -> [String] -- ^ Additional error information.
-        -> a
-failCGI c m es = throwDyn (CGIException c m es)
 
 -- | Catches any expection thrown by a CGI action, and uses the given 
 --   exception handler if an exception is thrown.

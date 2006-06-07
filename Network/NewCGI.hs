@@ -31,7 +31,7 @@ module Network.NewCGI (
   , MonadIO, liftIO
   , runCGI
   -- * Error handling
-  , failCGI, catchCGI, tryCGI, handleExceptionCGI
+  , catchCGI, tryCGI, handleExceptionCGI
   -- * Logging
   , logCGI
   -- * Output
@@ -74,7 +74,7 @@ import Network (PortID, Socket, listenOn, connectTo)
 import Network.Socket as Socket (SockAddr(SockAddrInet), accept, socketToHandle)
 import System.IO (hGetLine, hClose, IOMode(ReadWriteMode))
 import System.IO.Error (isEOFError)
-import Text.Html (Html, renderHtml)
+import Text.XHtml (Html, renderHtml)
 
 
 -- | Run a CGI action. Typically called by the main function.

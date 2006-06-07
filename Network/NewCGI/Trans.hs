@@ -20,6 +20,7 @@ module Network.NewCGI.Trans (module Network.NewCGI) where
 import Control.Monad.Trans
 
 import Network.NewCGI
+import Network.NewCGI.Internals
 
 -- requires -fallow-undecidable-instances and -fallow-overlapping-instances
 -- FIXME: can we achieve this without hairy extensions?
