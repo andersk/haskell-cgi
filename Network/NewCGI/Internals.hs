@@ -21,7 +21,7 @@ module Network.NewCGI.Internals (
   , Input(..), HeaderName(..)
   , hRunCGI, runCGIEnv, runCGIEnvFPS
   -- * Error handling
-  , catchCGI, tryCGI, handleExceptionCGI
+  , throwCGI, catchCGI, tryCGI, handleExceptionCGI
   -- * Logging
   , logCGI
   -- * Environment variables
@@ -34,8 +34,9 @@ module Network.NewCGI.Internals (
   , maybeRead
  ) where
 
-import Control.Exception as Exception (Exception, try)
+import Control.Exception as Exception (Exception, try, throwIO)
 import Control.Monad (liftM)
+import Control.Monad.Error (MonadError(..))
 import Control.Monad.State (StateT(..), gets, lift, modify)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
 import Data.Char (toLower)
@@ -183,6 +184,15 @@ defaultContentType = "text/html; charset=ISO-8859-1"
 --
 -- * Error handling
 --
+
+instance MonadError Exception (CGIT IO) where
+    throwError = throwCGI
+    catchError = catchCGI
+
+-- | Throw an exception in a CGI monad. The monad is required to be
+--   a 'MonadIO', so that we can use 'throwIO' to guarantee ordering.
+throwCGI :: (MonadCGI m, MonadIO m) => Exception -> m a
+throwCGI = liftIO . throwIO
 
 -- | Catches any expection thrown by a CGI action, and uses the given 
 --   exception handler if an exception is thrown.

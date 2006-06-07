@@ -43,7 +43,7 @@ module Network.NewCGI (
   , MonadIO, liftIO
   , runCGI
   -- * Error handling
-  , catchCGI, tryCGI, handleExceptionCGI
+  , throwCGI, catchCGI, tryCGI, handleExceptionCGI
   , handleErrors
   -- * Logging
   , logCGI
