@@ -9,7 +9,7 @@
 -- Portability :  non-portable
 --
 -- A simple error handler for NewCGI programs which outputs error pages
--- and log errors.
+-- and logs errors.
 --
 -----------------------------------------------------------------------------
 
