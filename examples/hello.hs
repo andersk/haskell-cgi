@@ -1,5 +1,7 @@
 import Network.NewCGI
 
+cgiMain :: CGI CGIResult
 cgiMain = output "Hello World!"
 
-main = runCGI cgiMain
+main :: IO ()
+main = runCGI (handleErrors cgiMain)

@@ -23,6 +23,17 @@
 -- A new, hopefully more flexible, interface
 -- and support for file uploads by Bjorn Bringert <mailto:bjorn@bringert.net>.
 --
+-- Here is a simple example, including error handling:
+--
+-- > import Network.NewCGI
+-- >
+-- > cgiMain :: CGI CGIResult
+-- > cgiMain = output "Hello World!"
+-- >
+-- > main :: IO ()
+-- > main = runCGI (handleErrors cgiMain)
+--
+--
 -----------------------------------------------------------------------------
 
 module Network.NewCGI (
