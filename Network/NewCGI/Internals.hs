@@ -45,7 +45,7 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Maybe (fromMaybe, listToMaybe)
 import Network.URI (unEscapeString,escapeURIString,isUnescapedInURI)
-import System.Environment (getEnv)
+import System.Environment (getEnvironment)
 import System.IO (Handle, hPutStrLn, stderr, hFlush)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
@@ -228,43 +228,7 @@ logCGI s = liftIO (hPutStrLn stderr s)
 --
 
 getCGIVars :: IO [(String,String)]
-getCGIVars = mapM (\n -> (,) n `liftM` getEnvOrNil n) cgiVarNames
-
-cgiVarNames :: [String]
-cgiVarNames =
-   [ "DOCUMENT_ROOT"
-   , "AUTH_TYPE"
-   , "GATEWAY_INTERFACE"
-   , "SERVER_SOFTWARE"
-   , "SERVER_NAME"
-   , "REQUEST_METHOD"
-   , "REQUEST_URI"
-   , "SERVER_ADMIN"
-   , "SERVER_PORT"
-   , "QUERY_STRING"
-   , "CONTENT_LENGTH"
-   , "CONTENT_TYPE"
-   , "REMOTE_USER"
-   , "REMOTE_IDENT"
-   , "REMOTE_ADDR"
-   , "REMOTE_HOST"
-   , "TZ"
-   , "PATH"
-   , "PATH_INFO"
-   , "PATH_TRANSLATED"
-   , "SCRIPT_NAME"
-   , "SCRIPT_FILENAME"
-   , "HTTP_COOKIE"
-   , "HTTP_CONNECTION"
-   , "HTTP_ACCEPT_LANGUAGE"
-   , "HTTP_ACCEPT"
-   , "HTTP_HOST"
-   , "HTTP_UA_COLOR"
-   , "HTTP_UA_CPU"
-   , "HTTP_UA_OS"
-   , "HTTP_UA_PIXELS"
-   , "HTTP_USER_AGENT"
-   ]
+getCGIVars = getEnvironment
 
 --
 -- * Inputs
@@ -407,11 +371,6 @@ replace x y = map (\z -> if z == x then y else z)
 
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . reads
-
--- | Get the value of an environment variable, or
---   the empty string of the variable is not set.
-getEnvOrNil :: String -> IO String
-getEnvOrNil v = getEnv v `Prelude.catch` const (return "")
 
 -- | Same as 'lookup' specialized to strings, but 
 --   returns the empty string if lookup fails.
