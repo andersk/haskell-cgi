@@ -72,8 +72,8 @@ module Network.NewCGI (
 import Control.Exception (Exception(..))
 import Control.Monad (liftM, unless)
 import Control.Monad.Trans (MonadIO, liftIO)
-import Data.List (intersperse)
-import Data.Maybe (listToMaybe, fromMaybe)
+import Data.List (intersperse, sort, group)
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
                   stdin, stdout)
@@ -292,8 +292,8 @@ getMultiInput :: MonadCGI m =>
                  String -- ^ The name of the variable.
               -> m [String] -- ^ The values of the variable,
                             -- or the empty list if the variable was not set.
-getMultiInput n = 
-    (map inputValue . Map.findWithDefault [] n) `liftM` cgiGet cgiInput
+getMultiInput n = do is <- cgiGet cgiInput
+                     return [inputValue v | (p,v) <- is, p == n]
 
 -- | Get the file name of an input.
 getInputFilename :: MonadCGI m =>
@@ -314,12 +314,13 @@ readInput = liftM (>>= maybeRead) . getInput
 --   Note: the same name may occur more than once in the output,
 --   if there are several values for the name.
 getInputs :: MonadCGI m => m [(String,String)]
-getInputs = (f . Map.toList) `liftM` cgiGet cgiInput
-  where f ps = [ (n,inputValue i) | (n,is) <- ps, i <- is ]
+getInputs = do is <- cgiGet cgiInput
+               return [ (n,inputValue i) | (n,i) <- is ]
 
 -- | Get the names of all input variables.
 getInputNames :: MonadCGI m => m [String]
-getInputNames = Map.keys `liftM` cgiGet cgiInput
+getInputNames = (sortNub . map fst) `liftM` cgiGet cgiInput
+    where sortNub = map head . group . sort
 
 -- Internal stuff
 
@@ -327,8 +328,7 @@ inputValue :: Input -> String
 inputValue = BS.unpack . value
 
 getInput_ ::  MonadCGI m => String -> m (Maybe Input)
-getInput_ n = 
-    (maybe Nothing listToMaybe . Map.lookup n) `liftM` cgiGet cgiInput
+getInput_ n = lookup n `liftM` cgiGet cgiInput
 
 
 --

@@ -57,8 +57,9 @@ import Network.Multipart
 data CGIState = CGIState {
                           -- | Environment variables.
                           cgiVars :: Map String String,
-                          -- | Input parameters.
-                          cgiInput :: Map String [Input],
+                          -- | Input parameters. For better laziness in reading inputs,
+                          --   this is not a Map.
+                          cgiInput :: [(String, Input)],
                           -- | Response headers.
                           cgiHeaders :: Map HeaderName String
                          }
@@ -161,7 +162,7 @@ runCGIEnvFPS :: Monad m =>
 runCGIEnvFPS vars inp f
     = do let s = CGIState {
                            cgiVars = Map.fromList vars,
-                           cgiInput = mkMultiMap $ decodeInput vars inp,
+                           cgiInput = decodeInput vars inp,
                            cgiHeaders = Map.empty
                           }
          (outp,s') <- runStateT (unCGIT f) s
@@ -395,9 +396,6 @@ bodyPartToInput (BodyPart hs b) =
 --
 -- * Utilities
 --
-
-mkMultiMap :: Ord a => [(a,b)] -> Map a [b]
-mkMultiMap xs = Map.fromListWith (++) [(x,[y]) | (x,y) <- xs]
 
 -- | Replace all instances of a value in a list by another value.
 replace :: Eq a =>
