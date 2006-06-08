@@ -103,7 +103,7 @@ instance Monad m => Monad (CGIT m) where
     c >>= f = CGIT (unCGIT c >>= unCGIT . f)
     return = CGIT . return
     -- FIXME: should we have an error monad instead?
-    fail s = CGIT (fail s)
+    fail s = CGIT (StateT (fail s))
 
 instance MonadIO m => MonadIO (CGIT m) where
     liftIO f = CGIT (liftIO f)

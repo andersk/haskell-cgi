@@ -77,6 +77,7 @@ import Data.Maybe (listToMaybe)
 import qualified Data.Map as Map
 import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
                   stdin, stdout)
+import System.IO.Error (isUserError, ioeGetErrorString)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
@@ -172,10 +173,12 @@ handleErrors = flip catchCGI outputException
 -- | Output a 500 Internal Server Error with information from
 --   an 'Exception'.
 outputException :: (MonadCGI m,MonadIO m) => Exception -> m CGIResult
-outputException e = 
-    outputInternalServerError $ case e of
-                                  ErrorCall msg -> msg
-                                  _             -> show e
+outputException e = outputInternalServerError es
+    where es = case e of
+                 ErrorCall msg  -> [msg]
+                 IOException ie -> ioe ie
+                 _              -> [show e]
+          ioe ie = if isUserError ie then [ioeGetErrorString ie] else [show ie]
 
 -- | Output an error page to the user, with the given
 --   HTTP status code in the response. Also logs the error information
@@ -223,9 +226,9 @@ outputMethodNotAllowed ms =
 
 -- | Use 'outputError' to output and log a 500 Internal Server Error.
 outputInternalServerError :: (MonadIO m, MonadCGI m) =>
-                             String -- ^ Error message.
+                             [String] -- ^ Error information.
                           -> m CGIResult
-outputInternalServerError e = outputError 500 "Internal Server Error" [e]
+outputInternalServerError es = outputError 500 "Internal Server Error" es
 
 
 --
