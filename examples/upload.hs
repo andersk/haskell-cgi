@@ -7,26 +7,26 @@ import Data.Maybe (fromJust)
 
 import qualified Data.ByteString.Lazy as BS
 import Network.NewCGI
+import Text.XHtml
 
 dir = "../upload"
 
-cgiMain = do m <- getInputFilename "file"
-             case m of 
-               Just n  -> saveFile n
-               Nothing -> output form
-
 saveFile n =
-    do
-    cont <- liftM fromJust $ getInputFPS "file"
-    let p = dir ++ "/" ++ basename n
-    liftIO $ BS.writeFile p cont
-    output $ "Saved as <a href='" ++ p ++ "'>" ++ p ++ "</a>."
+    do cont <- liftM fromJust $ getInputFPS "file"
+       let p = dir ++ "/" ++ basename n
+       liftIO $ BS.writeFile p cont
+       return $ paragraph << ("Saved as " +++ anchor ! [href p] << p +++ ".")
 
-form = concat ["<html><body><form method='post' enctype='multipart/form-data'>",
-               "<input type='file' name='file' /><br />",
-               "<input type='submit' />",
-               "</form></body></html>"]
+fileForm = form ! [method "post", enctype "multipart/form-data"]
+             << [afile "file", submit "" "Upload"]
+
 
 basename = reverse . takeWhile (`notElem` "/\\") . reverse
+
+cgiMain = 
+    do mn <- getInputFilename "file"
+       h <- maybe (return fileForm) saveFile mn
+       output $ renderHtml $ header << thetitle << "Upload example" 
+                               +++ body << h
 
 main = runCGI cgiMain
