@@ -73,7 +73,7 @@ import Control.Exception (Exception(..))
 import Control.Monad (liftM, unless)
 import Control.Monad.Trans (MonadIO, liftIO)
 import Data.List (intersperse)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, fromMaybe)
 import qualified Data.Map as Map
 import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
                   stdin, stdout)
@@ -94,14 +94,8 @@ import Network.Socket as Socket (SockAddr(SockAddrInet), accept, socketToHandle)
 import System.IO (hGetLine, hClose, IOMode(ReadWriteMode))
 import System.IO.Error (isEOFError)
 import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++), 
-                   body, h1, paragraph, hr)
+                   body, h1, paragraph, hr, address)
 
--- FIXME: get this from cabal
-packageName :: String
-packageName = "cgi"
-
-packageVersion :: String
-packageVersion = "0.1"
 
 -- | Run a CGI action. Typically called by the main function.
 --   Reads input from stdin and writes to stdout. Gets
@@ -199,7 +193,7 @@ outputError :: (MonadCGI m, MonadIO m) =>
             -> m CGIResult
 outputError c m es = 
       do logCGI $ show (c,m,es)
-         setHeader "Status" (show c)
+         setHeader "Status" (show c ++ " " ++ m)
          page <- errorPage c m es 
          output $ renderHtml page
 
@@ -211,12 +205,15 @@ errorPage :: MonadCGI m =>
           -> m Html
 errorPage c m es = 
     do server <- getVar "SERVER_SOFTWARE"
+       host   <- getVar "SERVER_NAME"
+       port   <- getVar "SERVER_PORT"
        let tit = show c ++ " " ++ m
-           sig = packageName ++ "-" ++ packageVersion
-                 ++ maybe "" (" on " ++) server
+           sig = "Haskell CGI" 
+                 ++ " on " ++ fromMaybe "" server
+                 ++ " at " ++ fromMaybe "" host ++ maybe "" (", port "++) port
        return $ header << thetitle << tit 
                   +++ body << (h1 << tit +++ map (paragraph <<) es 
-                               +++ hr +++ paragraph << sig)
+                               +++ hr +++ address << sig)
 
 --
 -- * Specific HTTP errors
