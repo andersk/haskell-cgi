@@ -96,6 +96,12 @@ import System.IO.Error (isEOFError)
 import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++), 
                    body, h1, paragraph, hr)
 
+-- FIXME: get this from cabal
+packageName :: String
+packageName = "cgi"
+
+packageVersion :: String
+packageVersion = "0.1"
 
 -- | Run a CGI action. Typically called by the main function.
 --   Reads input from stdin and writes to stdout. Gets
@@ -130,6 +136,9 @@ outputFPS = return . CGIOutput
 --   The file must be a regular file, since this function looks at its
 --   size to set the Content-length header. To output the contents of
 --   non-regular files, use 'outputFPS'. 
+--
+--   FIXME: Maybe we should look at the HTTP_IF_MODIFIED_SINCE header
+--   and only output the file if it is newer?
 outputFile :: (MonadIO m, MonadCGI m) =>
               FilePath
            -> m CGIResult
@@ -191,18 +200,23 @@ outputError :: (MonadCGI m, MonadIO m) =>
 outputError c m es = 
       do logCGI $ show (c,m,es)
          setHeader "Status" (show c)
-         output $ renderHtml $ errorPage c m es 
+         page <- errorPage c m es 
+         output $ renderHtml page
 
 -- | Create an HTML error page.
-errorPage :: Int      -- ^ Status code
+errorPage :: MonadCGI m => 
+             Int      -- ^ Status code
           -> String   -- ^ Status message
           -> [String] -- ^ Error information
-          -> Html
-errorPage c m es = header << thetitle << tit 
-                   +++ body << (h1 << tit +++ map (paragraph <<) es 
-                                +++ hr +++ paragraph << sig)
-    where tit = show c ++ " " ++ m
-          sig = "Network.NewCGI/X.X" -- FIXME: get from somewhere
+          -> m Html
+errorPage c m es = 
+    do server <- getVar "SERVER_SOFTWARE"
+       let tit = show c ++ " " ++ m
+           sig = packageName ++ "-" ++ packageVersion
+                 ++ maybe "" (" on " ++) server
+       return $ header << thetitle << tit 
+                  +++ body << (h1 << tit +++ map (paragraph <<) es 
+                               +++ hr +++ paragraph << sig)
 
 --
 -- * Specific HTTP errors
