@@ -11,6 +11,7 @@ form = concat ["<html><body><form>",
                "</form></body></html>"]
 
 sendFile f = do setHeader "Content-type" "application/octet-stream"
+                setHeader "Content-Disposition" ("attachment; filename=" ++ show f)
                 outputFile f
 
 cgiMain = getInput "file" >>= maybe (output form) sendFile

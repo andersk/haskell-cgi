@@ -75,9 +75,14 @@ import Control.Monad.Trans (MonadIO, liftIO)
 import Data.List (intersperse, sort, group)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
+import System.Directory (getModificationTime)
 import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
                   stdin, stdout)
 import System.IO.Error (isUserError, ioeGetErrorString)
+import System.Locale (defaultTimeLocale, rfc822DateFormat)
+import System.Time (ClockTime, toCalendarTime, toClockTime, formatCalendarTime)
+
+import System.Time.Parse (parseCalendarTime)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
@@ -130,15 +135,24 @@ outputFPS = return . CGIOutput
 --   The file must be a regular file, since this function looks at its
 --   size to set the Content-length header. To output the contents of
 --   non-regular files, use 'outputFPS'. 
+--   This function also sets the Last-Modified header, and
+--   honors the If-Modified-Since header.
 --
---   FIXME: Maybe we should look at HTTP_IF_MODIFIED_SINCE
---   and only output the file if it is newer?
+--   FIXME: should we use Content-Disposition: attachment; filename="f"
+--   to provide a filename to the client?
 outputFile :: (MonadIO m, MonadCGI m) =>
               FilePath
            -> m CGIResult
-outputFile f = do (c,sz) <- liftIO $ contentsAndSize f
-                  setHeader "Content-length" (show sz)
-                  outputFPS c
+outputFile f = 
+    do mt <- liftIO $ getModificationTime f
+       ims <- liftM (>>= parseHTTPDate) $ getVar "HTTP_IF_MODIFIED_SINCE"
+       case ims of
+         Just t | mt <= t -> do setStatus 304 "Not Modified"
+                                outputFPS BS.empty
+         _ -> do setHeader "Last-modified" =<< liftIO (formatHTTPDate mt)
+                 (c,sz) <- liftIO $ contentsAndSize f
+                 setHeader "Content-length" (show sz)
+                 outputFPS c
     where contentsAndSize x = do h <- openFile x ReadMode
                                  sz <- hFileSize h
                                  c <- BS.hGetContents h
@@ -379,6 +393,19 @@ setStatus :: MonadCGI m =>
           -> String -- ^ HTTP status message, e.g. @"Not Found"@
           -> m ()
 setStatus c m = setHeader "Status" (show c ++ " " ++ m)
+
+--
+-- * HTTP dates
+--
+
+formatHTTPDate :: ClockTime -> IO String
+formatHTTPDate = 
+       liftM (formatCalendarTime defaultTimeLocale rfc822DateFormat) 
+                 .  toCalendarTime
+
+parseHTTPDate :: String -> Maybe ClockTime
+parseHTTPDate = 
+    fmap toClockTime . parseCalendarTime defaultTimeLocale rfc822DateFormat
 
 
 --
