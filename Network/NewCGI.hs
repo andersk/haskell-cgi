@@ -80,7 +80,7 @@ import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
                   stdin, stdout)
 import System.IO.Error (isUserError, ioeGetErrorString)
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
-import System.Time (ClockTime, toCalendarTime, toClockTime, formatCalendarTime)
+import System.Time (ClockTime, toUTCTime, toClockTime, formatCalendarTime)
 
 import System.Time.Parse (parseCalendarTime)
 
@@ -149,7 +149,7 @@ outputFile f =
        case ims of
          Just t | mt <= t -> do setStatus 304 "Not Modified"
                                 outputFPS BS.empty
-         _ -> do setHeader "Last-modified" =<< liftIO (formatHTTPDate mt)
+         _ -> do setHeader "Last-modified" (formatHTTPDate mt)
                  (c,sz) <- liftIO $ contentsAndSize f
                  setHeader "Content-length" (show sz)
                  outputFPS c
@@ -398,10 +398,9 @@ setStatus c m = setHeader "Status" (show c ++ " " ++ m)
 -- * HTTP dates
 --
 
-formatHTTPDate :: ClockTime -> IO String
+formatHTTPDate :: ClockTime -> String
 formatHTTPDate = 
-       liftM (formatCalendarTime defaultTimeLocale rfc822DateFormat) 
-                 .  toCalendarTime
+       formatCalendarTime defaultTimeLocale rfc822DateFormat . toUTCTime
 
 parseHTTPDate :: String -> Maybe ClockTime
 parseHTTPDate = 
