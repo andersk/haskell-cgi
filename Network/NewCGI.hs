@@ -49,7 +49,7 @@ module Network.NewCGI (
   , logCGI
   -- * Output
   , output, outputFPS, outputFile, redirect
-  , setHeader
+  , setHeader, setStatus
   -- * Error pages
   , outputError 
   , outputNotFound, outputMethodNotAllowed, outputInternalServerError
@@ -131,7 +131,7 @@ outputFPS = return . CGIOutput
 --   size to set the Content-length header. To output the contents of
 --   non-regular files, use 'outputFPS'. 
 --
---   FIXME: Maybe we should look at the HTTP_IF_MODIFIED_SINCE header
+--   FIXME: Maybe we should look at HTTP_IF_MODIFIED_SINCE
 --   and only output the file if it is newer?
 outputFile :: (MonadIO m, MonadCGI m) =>
               FilePath
@@ -193,7 +193,7 @@ outputError :: (MonadCGI m, MonadIO m) =>
             -> m CGIResult
 outputError c m es = 
       do logCGI $ show (c,m,es)
-         setHeader "Status" (show c ++ " " ++ m)
+         setStatus c m
          page <- errorPage c m es 
          output $ renderHtml page
 
@@ -372,6 +372,13 @@ setHeader :: MonadCGI m =>
           -> m ()
 setHeader n v = cgiModify (\s -> s { cgiHeaders = f (cgiHeaders s) })
     where f = Map.insert (HeaderName n) v
+
+-- | Set the HTTP response status.
+setStatus :: MonadCGI m =>
+             Int -- ^  HTTP status code, e.g. @404@
+          -> String -- ^ HTTP status message, e.g. @"Not Found"@
+          -> m ()
+setStatus c m = setHeader "Status" (show c ++ " " ++ m)
 
 
 --
