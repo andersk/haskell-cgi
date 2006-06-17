@@ -75,9 +75,7 @@ import Control.Monad.Trans (MonadIO, liftIO)
 import Data.List (intersperse, sort, group)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
-import System.Directory (getModificationTime)
-import System.IO (Handle, hPutStrLn, openFile, hFileSize, IOMode(ReadMode),
-                  stdin, stdout)
+import System.IO (Handle, hPutStrLn, stdin, stdout)
 import System.IO.Error (isUserError, ioeGetErrorString)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
