@@ -90,7 +90,7 @@ type CGI a = CGIT IO a
 
 -- | The result of a CGI program.
 data CGIResult = CGIOutput ByteString
-               | CGIRedirect String
+               | CGINothing
                  deriving (Show, Read, Eq, Ord)
 
 --
@@ -171,8 +171,8 @@ runCGIEnvFPS vars inp f
            CGIOutput c ->  formatResponse c hs'
                where hs' = Map.insertWith (\_ o -> o) 
                              (HeaderName "Content-type") defaultContentType hs
-           CGIRedirect url -> formatResponse BS.empty hs'
-               where hs' = Map.insert (HeaderName "Location") url hs
+           CGINothing -> formatResponse BS.empty hs
+               where hs' = Map.delete (HeaderName "Content-type") hs
 
 formatResponse :: ByteString -> Map HeaderName String -> ByteString
 formatResponse c hs = 

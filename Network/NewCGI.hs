@@ -48,7 +48,7 @@ module Network.NewCGI (
   -- * Logging
   , logCGI
   -- * Output
-  , output, outputFPS, outputFile, redirect
+  , output, outputFPS, outputFile, outputNothing, redirect
   , setHeader, setStatus
   -- * Error pages
   , outputError 
@@ -148,7 +148,7 @@ outputFile f =
        ims <- liftM (>>= parseHTTPDate) $ getVar "HTTP_IF_MODIFIED_SINCE"
        case ims of
          Just t | mt <= t -> do setStatus 304 "Not Modified"
-                                outputFPS BS.empty
+                                outputNothing
          _ -> do setHeader "Last-modified" (formatHTTPDate mt)
                  (c,sz) <- liftIO $ contentsAndSize f
                  setHeader "Content-length" (show sz)
@@ -158,12 +158,16 @@ outputFile f =
                                  c <- BS.hGetContents h
                                  return (c,sz)
 
+-- | Do not output anything (except headers).
+outputNothing :: MonadCGI m => m CGIResult
+outputNothing = return CGINothing
+
 -- | Redirect to some location.
 redirect :: MonadCGI m =>
             String        -- ^ A URL to redirect to.
          -> m CGIResult
-redirect = return . CGIRedirect
-
+redirect url = do setHeader "Location" url
+                  outputNothing
 
 --
 -- * Error handling
@@ -208,6 +212,7 @@ outputError :: (MonadCGI m, MonadIO m) =>
 outputError c m es = 
       do logCGI $ show (c,m,es)
          setStatus c m
+         setHeader "Content-type" "text/html; charset=ISO-8859-1"
          page <- errorPage c m es 
          output $ renderHtml page
 
