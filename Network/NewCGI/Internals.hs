@@ -172,7 +172,6 @@ runCGIEnvFPS vars inp f
                where hs' = Map.insertWith (\_ o -> o) 
                              (HeaderName "Content-type") defaultContentType hs
            CGINothing -> formatResponse BS.empty hs
-               where hs' = Map.delete (HeaderName "Content-type") hs
 
 formatResponse :: ByteString -> Map HeaderName String -> ByteString
 formatResponse c hs = 
