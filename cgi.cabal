@@ -7,7 +7,7 @@ Author: Bjorn Bringert
 Homepage: http://www.cs.chalmers.se/~bringert/darcs/haskell-cgi/doc/
 License: BSD3
 License-file: LICENSE
-Build-depends: haskell98, base, network, parsec, mtl, fps >= 0.7, xhtml, parsedate
+Build-depends: haskell98, base, network, parsec, mtl, fps >= 0.7, xhtml
 Extensions: 
 Synopsis: A Haskell library for writing CGI programs
 Description:
