@@ -45,13 +45,21 @@ extraFieldLine =
 -- * Parameters (for Content-type etc.)
 --
 
+
 p_parameter :: Parser (String,String)
 p_parameter =
   do lexeme $ char ';'
      p_name <- lexeme $ p_token
      lexeme $ char '='
-     p_value <- literalString <|> p_token
+     -- Workaround for seemingly standardized web browser bug
+     -- where nothing is escaped in the filename parameter
+     -- of the content-disposition header in multipart/form-data
+     let litStr = if p_name == "filename" 
+                   then buggyLiteralString
+                   else literalString
+     p_value <- litStr <|> p_token
      return (map toLower p_name, p_value)
+
 
 -- 
 -- * Content type
@@ -155,6 +163,19 @@ literalString = do char '\"'
 		   str <- many (noneOf "\"\\" <|> quoted_pair)
 		   char '\"'
 		   return str
+
+-- No web browsers seem to implement RFC 2046 correctly,
+-- since they do not escape double quotes and backslashes
+-- in the filename parameter in multipart/form-data.
+--
+-- Note that this eats everything until the last double quote on the line.
+buggyLiteralString :: Parser String
+buggyLiteralString = 
+    do char '\"'
+       str <- manyTill anyChar (try lastQuote)
+       return str
+  where lastQuote = do char '\"' 
+                       notFollowedBy (try (many (noneOf "\"") >> char '\"'))
 
 headerNameChar :: Parser Char
 headerNameChar = noneOf "\n\r:"
