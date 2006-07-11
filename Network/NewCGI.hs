@@ -57,7 +57,7 @@ module Network.NewCGI (
   , getInput, getInputFPS, readInput
   , getInputs, getInputNames
   , getMultiInput
-  , getInputFilename
+  , getInputFilename, getInputContentType
   , getVar, getVars
   -- * Cookies
   , Cookie(..), newCookie
@@ -83,6 +83,7 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Network.HTTP.Cookie (Cookie(..), showCookie, newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (deleteCookie)
+import Network.RFC822Headers (showContentType)
 import Network.NewCGI.Internals
 
 -- imports only needed by the compatibility functions
@@ -285,6 +286,13 @@ getInputFilename :: MonadCGI m =>
                  -> m (Maybe String) -- ^ The file name corresponding to the
                                      -- input, if there is one.
 getInputFilename = liftM (>>= filename) . getInput_
+
+-- | Get the content-type of an input, if the input exists, e.g. "image/jpeg".
+--   For non-file inputs, this function returns "text/plain".
+getInputContentType :: MonadCGI m =>
+                       String   -- ^ The name of the variable.
+                    -> m (Maybe String) -- ^ The content type, formatted as a string.
+getInputContentType = liftM (fmap (showContentType . contentType)) . getInput_
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: (Read a, MonadCGI m) =>

@@ -45,6 +45,13 @@ extraFieldLine =
 -- * Parameters (for Content-type etc.)
 --
 
+showParameters :: [(String,String)] -> String
+showParameters = concatMap f
+    where f (n,v) = "; " ++ n ++ "=\"" ++ concatMap esc v ++ "\""
+          esc '\\' = "\\\\"
+          esc '"'  = "\\\""
+          esc c | c `elem` ['\\','"'] = '\\':[c]
+                | otherwise = [c]
 
 p_parameter :: Parser (String,String)
 p_parameter =
@@ -68,6 +75,9 @@ p_parameter =
 data ContentType = 
 	ContentType String String [(String, String)]
     deriving (Show, Read, Eq, Ord)
+
+showContentType :: ContentType -> String
+showContentType (ContentType x y ps) = x ++ "/" ++ y ++ showParameters ps
 
 p_content_type :: Parser ContentType
 p_content_type = 
