@@ -13,7 +13,30 @@
 -- Partly based on code from WASHMail.
 --
 -----------------------------------------------------------------------------
-module Network.RFC822Headers where
+module Network.RFC822Headers (
+                              -- * Headers
+                              Header, 
+                              pHeaders,
+                              parseHeaders,
+
+                              -- * Content-type
+                              ContentType(..), 
+                              getContentType,
+                              parseContentType,
+                              showContentType,
+
+                              -- * Content-transfer-encoding
+                              ContentTransferEncoding(..),
+                              getContentTransferEncoding,
+                              parseContentTransferEncoding,
+
+                              -- * Content-disposition
+                              ContentDisposition(..),
+                              getContentDisposition,                           
+                              parseContentDisposition,
+                              
+                              -- * Utilities
+                              parseM) where
 
 import Data.Char
 import Data.List
@@ -21,8 +44,11 @@ import Text.ParserCombinators.Parsec
 
 type Header = (String, String)
 
-p_fields :: Parser [Header]
-p_fields = many p_field
+pHeaders :: Parser [Header]
+pHeaders = many p_field
+
+parseHeaders :: Monad m => SourceName -> String -> m [Header]
+parseHeaders s inp = parseM pHeaders s inp
 
 p_field :: Parser Header
 p_field = 
@@ -79,8 +105,8 @@ data ContentType =
 showContentType :: ContentType -> String
 showContentType (ContentType x y ps) = x ++ "/" ++ y ++ showParameters ps
 
-p_content_type :: Parser ContentType
-p_content_type = 
+pContentType :: Parser ContentType
+pContentType = 
   do many ws1
      c_type <- p_token
      lexeme $ char '/'
@@ -88,11 +114,11 @@ p_content_type =
      c_parameters <- many p_parameter
      return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
 
-parseContentType :: String -> Maybe ContentType
-parseContentType = parseM p_content_type "Content-type"
+parseContentType :: Monad m => String -> m ContentType
+parseContentType = parseM pContentType "Content-type"
 
-getContentType :: [Header] -> Maybe ContentType
-getContentType hs = lookup "content-type" hs >>= parseContentType
+getContentType :: Monad m => [Header] -> m ContentType
+getContentType hs = lookupM "content-type" hs >>= parseContentType
 
 --
 -- * Content transfer encoding
@@ -102,20 +128,19 @@ data ContentTransferEncoding =
 	ContentTransferEncoding String
     deriving (Show, Read, Eq, Ord)
 
-p_content_transfer_encoding :: Parser ContentTransferEncoding
-p_content_transfer_encoding =
+pContentTransferEncoding :: Parser ContentTransferEncoding
+pContentTransferEncoding =
   do many ws1
      c_cte <- p_token
      return $ ContentTransferEncoding (map toLower c_cte)
 
-parseContentTransferEncoding :: String -> Maybe ContentTransferEncoding
+parseContentTransferEncoding :: Monad m => String -> m ContentTransferEncoding
 parseContentTransferEncoding = 
-    parseM p_content_transfer_encoding "Content-transfer-encoding"
+    parseM pContentTransferEncoding "Content-transfer-encoding"
 
-getContentTransferEncoding :: [Header] -> Maybe ContentTransferEncoding
-getContentTransferEncoding hs = lookup "content-transfer-encoding" hs 
-                    >>= parseM p_content_transfer_encoding 
-                            "Content-transfer-encoding"
+getContentTransferEncoding :: Monad m => [Header] -> m ContentTransferEncoding
+getContentTransferEncoding hs = 
+    lookupM "content-transfer-encoding" hs >>= parseContentTransferEncoding
 
 --
 -- * Content disposition
@@ -125,22 +150,22 @@ data ContentDisposition =
 	ContentDisposition String [(String, String)]
     deriving (Show, Read, Eq, Ord)
 
-p_content_disposition :: Parser ContentDisposition
-p_content_disposition =
+pContentDisposition :: Parser ContentDisposition
+pContentDisposition =
   do many ws1
      c_cd <- p_token
      c_parameters <- many p_parameter
      return $ ContentDisposition (map toLower c_cd) c_parameters
 
-parseContentDisposition :: String -> Maybe ContentDisposition
-parseContentDisposition = parseM p_content_disposition "Content-disposition"
+parseContentDisposition :: Monad m => String -> m ContentDisposition
+parseContentDisposition = parseM pContentDisposition "Content-disposition"
 
-getContentDisposition :: [Header] -> Maybe ContentDisposition
+getContentDisposition :: Monad m => [Header] -> m ContentDisposition
 getContentDisposition hs = 
-    lookup "content-disposition" hs  >>= parseContentDisposition
+    lookupM "content-disposition" hs  >>= parseContentDisposition
 
 --
--- * Using parsers
+-- * Utilities
 --
 
 parseM :: Monad m => Parser a -> SourceName -> String -> m a
@@ -148,6 +173,9 @@ parseM p n inp =
   case parse p n inp of
     Left e -> fail (show e)
     Right x -> return x
+
+lookupM :: (Monad m, Eq a, Show a) => a -> [(a,b)] -> m b
+lookupM n = maybe (fail ("No such field: " ++ show n)) return . lookup n
 
 -- 
 -- * Parsing utilities

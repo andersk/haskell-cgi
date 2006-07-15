@@ -75,7 +75,7 @@ parseBodyPart :: ByteString -> Maybe BodyPart
 parseBodyPart s =
     do
     (hdr,bdy) <- splitAtEmptyLine s
-    hs <- parseM p_fields "<input>" (BS.unpack hdr)
+    hs <- parseM pHeaders "<input>" (BS.unpack hdr)
     return $ BodyPart hs bdy
 
 --
