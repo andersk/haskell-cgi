@@ -287,8 +287,8 @@ getInputFilename :: MonadCGI m =>
                                      -- input, if there is one.
 getInputFilename = liftM (>>= filename) . getInput_
 
--- | Get the content-type of an input, if the input exists, e.g. "image/jpeg".
---   For non-file inputs, this function returns "text/plain".
+-- | Get the content-type of an input, if the input exists, e.g. "image\/jpeg".
+--   For non-file inputs, this function returns "text\/plain".
 getInputContentType :: MonadCGI m =>
                        String   -- ^ The name of the variable.
                     -> m (Maybe String) -- ^ The content type, formatted as a string.
