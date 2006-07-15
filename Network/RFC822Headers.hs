@@ -16,6 +16,7 @@
 module Network.RFC822Headers (
                               -- * Headers
                               Header, 
+                              pHeader,
                               pHeaders,
                               parseHeaders,
 
@@ -45,13 +46,13 @@ import Text.ParserCombinators.Parsec
 type Header = (String, String)
 
 pHeaders :: Parser [Header]
-pHeaders = many p_field
+pHeaders = many pHeader
 
 parseHeaders :: Monad m => SourceName -> String -> m [Header]
 parseHeaders s inp = parseM pHeaders s inp
 
-p_field :: Parser Header
-p_field = 
+pHeader :: Parser Header
+pHeader = 
     do name <- many1 headerNameChar
        char ':'
        many ws1
