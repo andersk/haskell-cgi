@@ -51,7 +51,7 @@ module Network.NewCGI (
   , output, outputFPS, outputNothing, redirect
   , setHeader, setStatus
   -- * Error pages
-  , outputError 
+  , outputError, outputException,  
   , outputNotFound, outputMethodNotAllowed, outputInternalServerError
   -- * Input
   , getInput, getInputFPS, readInput
