@@ -25,6 +25,7 @@ Exposed-Modules:
    Network.NewCGI,
    Network.NewCGI.Monad,
    Network.NewCGI.Protocol,
+   Network.NewCGI.Compat,
    Network.Multipart,
    Network.RFC822Headers,
    Network.HTTP.Cookie

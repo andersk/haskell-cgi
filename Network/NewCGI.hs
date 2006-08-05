@@ -66,16 +66,16 @@ module Network.NewCGI (
   -- * URL encoding
   , formEncode, urlEncode, formDecode, urlDecode
   -- * Compatibility with the old API
-  , Html, wrapper, pwrapper, connectToCGIScript
+  , module Network.NewCGI.Compat
   ) where
 
 import Control.Exception (Exception(..))
-import Control.Monad (liftM, unless)
+import Control.Monad (liftM)
 import Control.Monad.Trans (MonadIO, liftIO)
 import Data.List (intersperse, sort, group)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
-import System.IO (Handle, hPutStrLn, stdin, stdout)
+import System.IO (stdin, stdout)
 import System.IO.Error (isUserError, ioeGetErrorString)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
@@ -86,14 +86,8 @@ import qualified Network.HTTP.Cookie as Cookie (deleteCookie)
 import Network.RFC822Headers (showContentType)
 import Network.NewCGI.Monad
 import Network.NewCGI.Protocol
+import Network.NewCGI.Compat
 
--- imports only needed by the compatibility functions
-import Control.Concurrent (forkIO)
-import Control.Exception as Exception (Exception,throw,catch,finally)
-import Network (PortID, Socket, listenOn, connectTo)
-import Network.Socket as Socket (SockAddr(SockAddrInet), accept, socketToHandle)
-import System.IO (hGetLine, hClose, IOMode(ReadWriteMode))
-import System.IO.Error (isEOFError)
 import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++), 
                    body, h1, paragraph, hr, address)
 
@@ -373,79 +367,3 @@ setStatus :: MonadCGI m =>
           -> m ()
 setStatus c m = setHeader "Status" (show c ++ " " ++ m)
 
---
--- * Compatibility functions
---
-
-{-# DEPRECATED wrapper, pwrapper, connectToCGIScript "Use the new interface." #-}
-
--- | Compatibility wrapper for the old CGI interface.
---   Output the output from a function from CGI environment and
---   input variables to an HTML document.
-wrapper :: ([(String,String)] -> IO Html) -> IO ()
-wrapper = runCGI . wrapCGI
-
--- | Compatibility wrapper for the old CGI interface.
---   Runs a simple CGI server.
---   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
-pwrapper :: PortID  -- ^ The port to run the server on.
-         -> ([(String,String)] -> IO Html)
-         -> IO ()
-pwrapper pid f = do sock <- listenOn pid
-                    acceptConnections fn sock
- where fn h = do env <- getCGIVars
-                 hRunCGI env h h (runCGIT $ wrapCGI f)
-
-acceptConnections :: (Handle -> IO ()) -> Socket -> IO ()
-acceptConnections fn sock = do
-  (h, SockAddrInet _ _) <- accept' sock
-  forkIO (fn h `finally` (hClose h))
-  acceptConnections fn sock
-
-accept' :: Socket                 -- Listening Socket
-       -> IO (Handle,SockAddr)        -- StdIO Handle for read/write
-accept' sock = do
- (sock', addr) <- Socket.accept sock
- handle        <- socketToHandle sock' ReadWriteMode
- return (handle,addr)
-
-wrapCGI :: MonadIO m => ([(String,String)] -> IO Html) -> CGIT m CGIResult
-wrapCGI f = do
-            vs <- getVars
-            is <- getInputs
-            html <- liftIO (f (vs++is))
-            output (renderHtml html)
-
--- | Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
-connectToCGIScript :: String -> PortID -> IO ()
-connectToCGIScript host portId
-     = do env <- getCGIVars
-          input <- BS.hGetContents stdin
-          let str = getRequestInput env input
-          h <- connectTo host portId
-                 `Exception.catch`
-                   (\ e -> abort "Cannot connect to CGI daemon." e)
-          BS.hPut h str >> hPutStrLn h ""
-          (sendBack h `finally` hClose h)
-               `Prelude.catch` (\e -> unless (isEOFError e) (ioError e))
-
--- | Returns the query string, or the request body if it is
---   a POST request, or the empty string if there is an error.
-getRequestInput :: [(String,String)] -- ^ CGI environment variables.
-                -> ByteString            -- ^ Request body.
-                -> ByteString            -- ^ Query string.
-getRequestInput env req =
-   case lookup "REQUEST_METHOD" env of
-      Just "POST" -> takeInput env req
-      _ -> maybe BS.empty BS.pack (lookup "QUERY_STRING" env)
-
-abort :: String -> Exception -> IO a
-abort msg e =
-    do putStrLn ("Content-type: text/html\n\n" ++
-                   "<html><body>" ++ msg ++ "</body></html>")
-       throw e
-
-sendBack :: Handle -> IO ()
-sendBack h = do s <- hGetLine h
-                putStrLn s
-                sendBack h

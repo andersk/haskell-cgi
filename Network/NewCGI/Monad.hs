@@ -33,12 +33,7 @@ import Control.Monad.Writer (WriterT(..), tell)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
 import Data.Monoid (mempty)
 
-
-import qualified Data.ByteString.Lazy.Char8 as BS
-import Data.ByteString.Lazy.Char8 (ByteString)
-
 import Network.NewCGI.Protocol
-import Network.Multipart
 
 
 --
