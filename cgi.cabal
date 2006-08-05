@@ -23,7 +23,8 @@ Description:
    Network.CGI module.
 Exposed-Modules: 
    Network.NewCGI,
-   Network.NewCGI.Internals,
+   Network.NewCGI.Monad,
+   Network.NewCGI.Protocol,
    Network.Multipart,
    Network.RFC822Headers,
    Network.HTTP.Cookie

@@ -1,7 +1,6 @@
-{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances -fallow-overlapping-instances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.NewCGI.Internals
+-- Module      :  Network.NewCGI.Protocol
 -- Copyright   :  (c) Bjorn Bringert 2006
 -- License     :  BSD-style
 --
@@ -9,43 +8,36 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Internal stuff that most people shouldn't have to use.
--- This module mostly deals which the CGI protocol side,
--- and the internals of the CGIT monad transformer.
--- This can for example be used to write alternative run functions.
+-- An implementation of the program side of the CGI protocol.
 --
 -----------------------------------------------------------------------------
 
-module Network.NewCGI.Internals (
-    MonadCGI(..), CGIRequest(..), CGIT(..), CGIResult(..), CGI
-  , Input(..), Headers, HeaderName(..)
-  , hRunCGI, runCGIEnv, runCGIEnvFPS
-  -- * Error handling
-  , throwCGI, catchCGI, tryCGI, handleExceptionCGI
-  -- * Logging
-  , logCGI
-  -- * Environment variables
-  , getCGIVars
+module Network.NewCGI.Protocol (
+  -- * CGI request
+  CGIRequest(..), Input(..), 
+  -- * CGI response
+  CGIResult(..),
+  Headers, HeaderName(..),
+  -- * Running CGI actions
+  hRunCGI, runCGIEnvFPS,
   -- * Inputs
-  , takeInput
+  decodeInput, takeInput,
+  -- * Environment variables
+  getCGIVars,
+  -- * Logging
+  logCGI,
   -- * URL encoding
-  , formEncode, urlEncode, formDecode, urlDecode
+  formEncode, urlEncode, formDecode, urlDecode,
   -- * Utilities
-  , maybeRead
+  maybeRead
  ) where
 
-import Control.Exception as Exception (Exception, try, throwIO)
-import Control.Monad (liftM)
-import Control.Monad.Error (MonadError(..))
-import Control.Monad.Reader (ReaderT(..), asks)
-import Control.Monad.Writer (WriterT(..), tell)
-import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
+import Control.Monad.Trans (MonadIO(..))
 import Data.Char (toLower)
 import Data.List (intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Maybe (fromMaybe, listToMaybe, isJust)
-import Data.Monoid (mempty)
 import Network.URI (unEscapeString,escapeURIString,isUnescapedInURI)
 import System.Environment (getEnvironment)
 import System.IO (Handle, hPutStrLn, stderr, hFlush)
@@ -55,8 +47,10 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Network.Multipart
 
+
+
 --
--- * CGI requests
+-- * CGI request
 --
 
 -- | The input to a CGI action.
@@ -81,17 +75,13 @@ data Input = Input {
               deriving Show
 
 --
--- * CGI results
+-- * CGI response
 --
 
 -- | The result of a CGI program.
 data CGIResult = CGIOutput ByteString
                | CGINothing
                  deriving (Show, Read, Eq, Ord)
-
---
--- * Response headers
---
 
 type Headers = [(HeaderName, String)]
 
@@ -105,52 +95,6 @@ instance Ord HeaderName where
     HeaderName x `compare` HeaderName y = map toLower x `compare` map toLower y
 
 
---
--- * CGIT monad transformer
---
-
--- | A simple CGI monad with just IO.
-type CGI a = CGIT IO a
-
--- | The CGIT monad transformer.
-newtype CGIT m a = CGIT { unCGIT :: ReaderT CGIRequest (WriterT Headers m) a }
-
-instance Monad m => Functor (CGIT m) where
-    fmap f c = CGIT (fmap f (unCGIT c))
-
-instance Monad m => Monad (CGIT m) where
-    c >>= f = CGIT (unCGIT c >>= unCGIT . f)
-    return = CGIT . return
-    -- FIXME: should we have an error monad instead?
-    fail = CGIT . fail
-
-instance MonadIO m => MonadIO (CGIT m) where
-    liftIO = lift . liftIO
-
--- | The class of CGI monads. Most CGI actions can be run in
---   any monad which is an instance of this class, which means that
---   you can use your own monad transformers to add extra functionality.
-class Monad m => MonadCGI m where
-    -- | Add a response header.
-    cgiAddHeader :: HeaderName -> String -> m ()
-    -- | Get something from the CGI request.
-    cgiGet :: (CGIRequest -> a) -> m a
-
-instance Monad m => MonadCGI (CGIT m) where
-    cgiAddHeader n v = CGIT $ lift $ tell [(n,v)]
-    cgiGet = CGIT . asks
-
-instance MonadTrans CGIT where
-    lift = CGIT . lift . lift
-
--- requires -fallow-undecidable-instances and -fallow-overlapping-instances
-instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
-    cgiAddHeader n v = lift $ cgiAddHeader n v
-    cgiGet = lift . cgiGet
-
-
-runCGIT :: CGIT m a -> CGIRequest -> m (a, Headers)
-runCGIT (CGIT c) r = runWriterT $ runReaderT c r
 
 --
 -- * Running CGI actions
@@ -159,40 +103,30 @@ runCGIT (CGIT c) r = runWriterT $ runReaderT c r
 -- | Run a CGI action. Gets CGI environment variables from
 --   the program environment.
 hRunCGI :: MonadIO m =>
-           Handle -- ^ Handle that input will be read from.
+           [(String,String)] -- ^ CGI environment variables.
+        -> Handle -- ^ Handle that input will be read from.
         -> Handle -- ^ Handle that output will be written to.
-        -> CGIT m CGIResult -> m ()
-hRunCGI hin hout f = do env <- liftIO getCGIVars
-                        inp <- liftIO $ BS.hGetContents hin
-                        outp <- runCGIEnvFPS env inp f
-                        liftIO $ BS.hPut hout outp
-                        liftIO $ hFlush hout
-
--- | Run a CGI action in a given environment, using strings
---   for input and output. Note: this can be inefficient,
---   especially with file uploads. Use 'runCGIEnvFPS'
---   instead.
-runCGIEnv :: Monad m =>
-             [(String,String)] -- ^ CGI environment variables.
-          -> String -- ^ Request body.
-          -> CGIT m CGIResult -- ^ CGI action.
-          -> m String -- ^ Response (headers and content).
-runCGIEnv vars inp f = liftM BS.unpack $ runCGIEnvFPS vars (BS.pack inp) f
+        -> (CGIRequest -> m (CGIResult, Headers)) -- ^ CGI action
+        -> m ()
+hRunCGI env hin hout f = 
+    do inp <- liftIO $ BS.hGetContents hin
+       outp <- runCGIEnvFPS env inp f
+       liftIO $ BS.hPut hout outp
+       liftIO $ hFlush hout
 
 -- | Run a CGI action in a given environment, using a 'FastString'
 --   for input and a lazy string for output. 
 runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
           -> ByteString -- ^ Request body.
-          -> CGIT m CGIResult -- ^ CGI action.
+          -> (CGIRequest -> m (CGIResult, Headers)) -- ^ CGI action.
           -> m ByteString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
-    = do let s = CGIRequest {
-                             cgiVars = Map.fromList vars,
-                             cgiInputs = decodeInput vars inp,
-                             cgiRequestBody = inp
-                            }
-         (outp,hs) <- runCGIT f s
+    = do (outp,hs) <- f $ CGIRequest {
+                                      cgiVars = Map.fromList vars,
+                                      cgiInputs = decodeInput vars inp,
+                                      cgiRequestBody = inp
+                                     }
          return $ case outp of
            CGIOutput c -> formatResponse c hs'
                where hs' = if isJust (lookup ct hs)
@@ -208,57 +142,11 @@ formatResponse c hs =
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
 
---
--- * Error handling
---
-
-instance MonadError Exception (CGIT IO) where
-    throwError = throwCGI
-    catchError = catchCGI
-
--- | Throw an exception in a CGI monad. The monad is required to be
---   a 'MonadIO', so that we can use 'throwIO' to guarantee ordering.
-throwCGI :: (MonadCGI m, MonadIO m) => Exception -> m a
-throwCGI = liftIO . throwIO
-
--- | Catches any expection thrown by a CGI action, and uses the given 
---   exception handler if an exception is thrown.
-catchCGI :: CGI a -> (Exception -> CGI a) -> CGI a
-catchCGI c h = tryCGI c >>= either h return
-
--- | Catches any exception thrown by an CGI action, and returns either
---   the exception, or if no exception was raised, the result of the action.
-tryCGI :: CGI a -> CGI (Either Exception a)
-tryCGI (CGIT c) = CGIT (ReaderT (\r -> WriterT (f (runWriterT (runReaderT c r)))))
-    where
-      f = liftM (either (\ex -> (Left ex,mempty)) (\(a,w) -> (Right a,w))) . try
-
-{-# DEPRECATED handleExceptionCGI "Use catchCGI instead." #-}
--- | Deprecated version of 'catchCGI'. Use 'catchCGI' instead.
-handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
-handleExceptionCGI = catchCGI
-
---
--- * Logging
---
-
--- | Log some message using the server\'s logging facility.
--- FIXME: does this have to be more general to support
--- FastCGI etc? Maybe we should store log messages in the
--- CGIState?
-logCGI :: (MonadCGI m, MonadIO m) => String -> m ()
-logCGI s = liftIO (hPutStrLn stderr s)
-
---
--- * Environment variables
---
-
-getCGIVars :: IO [(String,String)]
-getCGIVars = getEnvironment
 
 --
 -- * Inputs
 --
+
 
 -- | Get and decode the input according to the request
 --   method and the content-type.
@@ -277,6 +165,23 @@ simpleInput v = Input { value = BS.pack v,
 defaultInputType :: ContentType
 defaultInputType = ContentType "text" "plain" [] -- FIXME: use some default encoding?
 
+--
+-- * Environment variables
+--
+
+getCGIVars :: MonadIO m => m [(String,String)]
+getCGIVars = liftIO getEnvironment
+
+--
+-- * Logging
+--
+
+-- | Log some message using the server\'s logging facility.
+-- FIXME: does this have to be more general to support
+-- FastCGI etc? Maybe we should store log messages in the
+-- CGIState?
+logCGI :: MonadIO m => String -> m ()
+logCGI s = liftIO (hPutStrLn stderr s)
 
 --
 -- * Query string
@@ -344,7 +249,8 @@ decodeBody ctype inp =
                    -> formInput (BS.unpack inp)
                Just (ContentType "multipart" "form-data" ps) 
                    -> multipartDecode ps inp
-               Just _ -> [] -- FIXME: report that we don't handle this content type
+               Just _ -> [] -- unknown content-type, the user will have to
+                            -- deal with it by looking at the raw content
                -- No content-type given, assume x-www-form-urlencoded
                Nothing -> formInput (BS.unpack inp)
 

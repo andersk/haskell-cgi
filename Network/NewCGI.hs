@@ -84,7 +84,8 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 import Network.HTTP.Cookie (Cookie(..), showCookie, newCookie, findCookie)
 import qualified Network.HTTP.Cookie as Cookie (deleteCookie)
 import Network.RFC822Headers (showContentType)
-import Network.NewCGI.Internals
+import Network.NewCGI.Monad
+import Network.NewCGI.Protocol
 
 -- imports only needed by the compatibility functions
 import Control.Concurrent (forkIO)
@@ -101,7 +102,8 @@ import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++),
 --   Reads input from stdin and writes to stdout. Gets
 --   CGI environment variables from the program environment.
 runCGI :: MonadIO m => CGIT m CGIResult -> m ()
-runCGI = hRunCGI stdin stdout
+runCGI f = do env <- getCGIVars
+              hRunCGI env stdin stdout (runCGIT f)
 
 
 --
@@ -391,7 +393,8 @@ pwrapper :: PortID  -- ^ The port to run the server on.
          -> IO ()
 pwrapper pid f = do sock <- listenOn pid
                     acceptConnections fn sock
- where fn h = hRunCGI h h (wrapCGI f)
+ where fn h = do env <- getCGIVars
+                 hRunCGI env h h (runCGIT $ wrapCGI f)
 
 acceptConnections :: (Handle -> IO ()) -> Socket -> IO ()
 acceptConnections fn sock = do
