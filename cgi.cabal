@@ -24,7 +24,6 @@ Description:
 Exposed-Modules: 
    Network.NewCGI,
    Network.NewCGI.Internals,
-   Network.NewCGI.Trans,
    Network.Multipart,
    Network.RFC822Headers,
    Network.HTTP.Cookie

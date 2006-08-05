@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances -fallow-overlapping-instances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.NewCGI.Internals
@@ -142,6 +142,12 @@ instance Monad m => MonadCGI (CGIT m) where
 
 instance MonadTrans CGIT where
     lift = CGIT . lift . lift
+
+-- requires -fallow-undecidable-instances and -fallow-overlapping-instances
+instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
+    cgiAddHeader n v = lift $ cgiAddHeader n v
+    cgiGet = lift . cgiGet
+
 
 runCGIT :: CGIT m a -> CGIRequest -> m (a, Headers)
 runCGIT (CGIT c) r = runWriterT $ runReaderT c r
