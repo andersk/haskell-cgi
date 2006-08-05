@@ -354,7 +354,7 @@ deleteCookie = setCookie . Cookie.deleteCookie
 -- * Headers
 --
 
--- | Set a response header.
+-- | Add a response header. 
 --   Example:
 --
 -- > setHeader "Content-type" "text/plain"

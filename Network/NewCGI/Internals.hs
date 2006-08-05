@@ -44,7 +44,7 @@ import Data.Char (toLower)
 import Data.List (intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
-import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Maybe (fromMaybe, listToMaybe, isJust)
 import Data.Monoid (mempty)
 import Network.URI (unEscapeString,escapeURIString,isUnescapedInURI)
 import System.Environment (getEnvironment)
@@ -93,7 +93,7 @@ data CGIResult = CGIOutput ByteString
 -- * Response headers
 --
 
-type Headers = Map HeaderName String
+type Headers = [(HeaderName, String)]
 
 -- | A string with case insensitive equality and comparisons.
 newtype HeaderName = HeaderName String deriving (Show)
@@ -137,7 +137,7 @@ class Monad m => MonadCGI m where
     cgiGet :: (CGIRequest -> a) -> m a
 
 instance Monad m => MonadCGI (CGIT m) where
-    cgiAddHeader n v = CGIT $ lift $ tell (Map.singleton n v)
+    cgiAddHeader n v = CGIT $ lift $ tell [(n,v)]
     cgiGet = CGIT . asks
 
 instance MonadTrans CGIT where
@@ -194,14 +194,15 @@ runCGIEnvFPS vars inp f
                             }
          (outp,hs) <- runCGIT f s
          return $ case outp of
-           CGIOutput c ->  formatResponse c hs'
-               where hs' = Map.insertWith (\_ o -> o) 
-                             (HeaderName "Content-type") defaultContentType hs
+           CGIOutput c -> formatResponse c hs'
+               where hs' = if isJust (lookup ct hs)
+                              then hs else hs ++ [(ct,defaultContentType)]
+                     ct = HeaderName "Content-type"
            CGINothing -> formatResponse BS.empty hs
 
 formatResponse :: ByteString -> Headers -> ByteString
 formatResponse c hs = 
-    BS.unlines ([BS.pack (n++": "++v) | (HeaderName n,v) <- Map.toList hs] 
+    BS.unlines ([BS.pack (n++": "++v) | (HeaderName n,v) <- hs] 
                 ++ [BS.empty,c])
 
 defaultContentType :: String
