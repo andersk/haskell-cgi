@@ -25,5 +25,5 @@ import Network.NewCGI.Internals
 -- requires -fallow-undecidable-instances and -fallow-overlapping-instances
 -- FIXME: can we achieve this without hairy extensions?
 instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
-    cgiModify = lift . cgiModify
+    cgiAddHeader n v = lift $ cgiAddHeader n v
     cgiGet = lift . cgiGet

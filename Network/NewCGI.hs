@@ -277,7 +277,7 @@ getMultiInput :: MonadCGI m =>
                  String -- ^ The name of the variable.
               -> m [String] -- ^ The values of the variable,
                             -- or the empty list if the variable was not set.
-getMultiInput n = do is <- cgiGet cgiInput
+getMultiInput n = do is <- cgiGet cgiInputs
                      return [inputValue v | (p,v) <- is, p == n]
 
 -- | Get the file name of an input.
@@ -306,12 +306,12 @@ readInput = liftM (>>= maybeRead) . getInput
 --   Note: the same name may occur more than once in the output,
 --   if there are several values for the name.
 getInputs :: MonadCGI m => m [(String,String)]
-getInputs = do is <- cgiGet cgiInput
+getInputs = do is <- cgiGet cgiInputs
                return [ (n,inputValue i) | (n,i) <- is ]
 
 -- | Get the names of all input variables.
 getInputNames :: MonadCGI m => m [String]
-getInputNames = (sortNub . map fst) `liftM` cgiGet cgiInput
+getInputNames = (sortNub . map fst) `liftM` cgiGet cgiInputs
     where sortNub = map head . group . sort
 
 -- Internal stuff
@@ -320,7 +320,7 @@ inputValue :: Input -> String
 inputValue = BS.unpack . value
 
 getInput_ ::  MonadCGI m => String -> m (Maybe Input)
-getInput_ n = lookup n `liftM` cgiGet cgiInput
+getInput_ n = lookup n `liftM` cgiGet cgiInputs
 
 
 --
@@ -362,8 +362,7 @@ setHeader :: MonadCGI m =>
              String -- ^ Header name.
           -> String -- ^ Header value.
           -> m ()
-setHeader n v = cgiModify (\s -> s { cgiHeaders = f (cgiHeaders s) })
-    where f = Map.insert (HeaderName n) v
+setHeader n v = cgiAddHeader (HeaderName n) v
 
 -- | Set the HTTP response status.
 setStatus :: MonadCGI m =>

@@ -17,8 +17,8 @@
 -----------------------------------------------------------------------------
 
 module Network.NewCGI.Internals (
-    MonadCGI(..), CGIState(..), CGIT(..), CGIResult(..), CGI
-  , Input(..), HeaderName(..)
+    MonadCGI(..), CGIRequest(..), CGIT(..), CGIResult(..), CGI
+  , Input(..), Headers, HeaderName(..)
   , hRunCGI, runCGIEnv, runCGIEnvFPS
   -- * Error handling
   , throwCGI, catchCGI, tryCGI, handleExceptionCGI
@@ -37,13 +37,15 @@ module Network.NewCGI.Internals (
 import Control.Exception as Exception (Exception, try, throwIO)
 import Control.Monad (liftM)
 import Control.Monad.Error (MonadError(..))
-import Control.Monad.State (StateT(..), gets, lift, modify)
-import Control.Monad.Trans (MonadTrans, MonadIO, liftIO)
+import Control.Monad.Reader (ReaderT(..), asks)
+import Control.Monad.Writer (WriterT(..), tell)
+import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
 import Data.Char (toLower)
 import Data.List (intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Monoid (mempty)
 import Network.URI (unEscapeString,escapeURIString,isUnescapedInURI)
 import System.Environment (getEnvironment)
 import System.IO (Handle, hPutStrLn, stderr, hFlush)
@@ -53,17 +55,45 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Network.Multipart
 
--- | The state ept in the CGIT monad transformer.
-data CGIState = CGIState {
-                          -- | Environment variables.
-                          cgiVars :: Map String String,
-                          -- | Input parameters. For better laziness in reading inputs,
-                          --   this is not a Map.
-                          cgiInput :: [(String, Input)],
-                          -- | Response headers.
-                          cgiHeaders :: Map HeaderName String
-                         }
+--
+-- * CGI requests
+--
+
+-- | The input to a CGI action.
+data CGIRequest = 
+    CGIRequest {
+                -- | Environment variables.
+                cgiVars :: Map String String,
+                -- | Input parameters. For better laziness in reading inputs,
+                --   this is not a Map.
+                cgiInputs :: [(String, Input)],
+                -- | Raw request body. 
+                cgiRequestBody :: ByteString
+               }
+    deriving Show
+
+-- | The value of an input parameter, and some metadata.
+data Input = Input {
+                    value :: ByteString,
+                    filename :: Maybe String,
+                    contentType :: ContentType
+                   }
               deriving Show
+
+--
+-- * CGI results
+--
+
+-- | The result of a CGI program.
+data CGIResult = CGIOutput ByteString
+               | CGINothing
+                 deriving (Show, Read, Eq, Ord)
+
+--
+-- * Response headers
+--
+
+type Headers = Map HeaderName String
 
 -- | A string with case insensitive equality and comparisons.
 newtype HeaderName = HeaderName String deriving (Show)
@@ -74,28 +104,16 @@ instance Eq HeaderName where
 instance Ord HeaderName where
     HeaderName x `compare` HeaderName y = map toLower x `compare` map toLower y
 
--- | The value of an input parameter, and some metadata.
-data Input = Input {
-                    value :: ByteString,
-                    filename :: Maybe String,
-                    contentType :: ContentType
-                   }
-              deriving Show
-
--- | The CGIT monad transformer.
-newtype CGIT m a = CGIT { unCGIT :: StateT CGIState m a }
-
--- | A simple CGI monad with just IO.
-type CGI a = CGIT IO a
-
--- | The result of a CGI program.
-data CGIResult = CGIOutput ByteString
-               | CGINothing
-                 deriving (Show, Read, Eq, Ord)
 
 --
 -- * CGIT monad transformer
 --
+
+-- | A simple CGI monad with just IO.
+type CGI a = CGIT IO a
+
+-- | The CGIT monad transformer.
+newtype CGIT m a = CGIT { unCGIT :: ReaderT CGIRequest (WriterT Headers m) a }
 
 instance Monad m => Functor (CGIT m) where
     fmap f c = CGIT (fmap f (unCGIT c))
@@ -104,26 +122,29 @@ instance Monad m => Monad (CGIT m) where
     c >>= f = CGIT (unCGIT c >>= unCGIT . f)
     return = CGIT . return
     -- FIXME: should we have an error monad instead?
-    fail s = CGIT (StateT (fail s))
+    fail = CGIT . fail
 
 instance MonadIO m => MonadIO (CGIT m) where
-    liftIO f = CGIT (liftIO f)
+    liftIO = lift . liftIO
 
 -- | The class of CGI monads. Most CGI actions can be run in
 --   any monad which is an instance of this class, which means that
 --   you can use your own monad transformers to add extra functionality.
 class Monad m => MonadCGI m where
-    -- | Modify the CGIT state.
-    cgiModify :: (CGIState -> CGIState) -> m ()
-    -- | Get something from the CGIT state.
-    cgiGet :: (CGIState -> a) -> m a
+    -- | Add a response header.
+    cgiAddHeader :: HeaderName -> String -> m ()
+    -- | Get something from the CGI request.
+    cgiGet :: (CGIRequest -> a) -> m a
 
 instance Monad m => MonadCGI (CGIT m) where
-    cgiModify = CGIT . modify
-    cgiGet = CGIT . gets
+    cgiAddHeader n v = CGIT $ lift $ tell (Map.singleton n v)
+    cgiGet = CGIT . asks
 
 instance MonadTrans CGIT where
-    lift = CGIT . lift
+    lift = CGIT . lift . lift
+
+runCGIT :: CGIT m a -> CGIRequest -> m (a, Headers)
+runCGIT (CGIT c) r = runWriterT $ runReaderT c r
 
 --
 -- * Running CGI actions
@@ -160,20 +181,19 @@ runCGIEnvFPS :: Monad m =>
           -> CGIT m CGIResult -- ^ CGI action.
           -> m ByteString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
-    = do let s = CGIState {
-                           cgiVars = Map.fromList vars,
-                           cgiInput = decodeInput vars inp,
-                           cgiHeaders = Map.empty
-                          }
-         (outp,s') <- runStateT (unCGIT f) s
-         let hs = cgiHeaders s'
+    = do let s = CGIRequest {
+                             cgiVars = Map.fromList vars,
+                             cgiInputs = decodeInput vars inp,
+                             cgiRequestBody = inp
+                            }
+         (outp,hs) <- runCGIT f s
          return $ case outp of
            CGIOutput c ->  formatResponse c hs'
                where hs' = Map.insertWith (\_ o -> o) 
                              (HeaderName "Content-type") defaultContentType hs
            CGINothing -> formatResponse BS.empty hs
 
-formatResponse :: ByteString -> Map HeaderName String -> ByteString
+formatResponse :: ByteString -> Headers -> ByteString
 formatResponse c hs = 
     BS.unlines ([BS.pack (n++": "++v) | (HeaderName n,v) <- Map.toList hs] 
                 ++ [BS.empty,c])
@@ -202,9 +222,9 @@ catchCGI c h = tryCGI c >>= either h return
 -- | Catches any exception thrown by an CGI action, and returns either
 --   the exception, or if no exception was raised, the result of the action.
 tryCGI :: CGI a -> CGI (Either Exception a)
-tryCGI (CGIT c) = CGIT (StateT (\s -> f s (runStateT c s)))
+tryCGI (CGIT c) = CGIT (ReaderT (\r -> WriterT (f (runWriterT (runReaderT c r)))))
     where
-      f s = liftM (either (\ex -> (Left ex,s)) (\(a,s') -> (Right a,s'))) . try
+      f = liftM (either (\ex -> (Left ex,mempty)) (\(a,w) -> (Right a,w))) . try
 
 {-# DEPRECATED handleExceptionCGI "Use catchCGI instead." #-}
 -- | Deprecated version of 'catchCGI'. Use 'catchCGI' instead.
