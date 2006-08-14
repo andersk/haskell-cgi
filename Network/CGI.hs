@@ -84,7 +84,7 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Network.CGI.Cookie (Cookie(..), showCookie, newCookie, findCookie)
 import qualified Network.CGI.Cookie as Cookie (deleteCookie)
-import Network.RFC822Headers (showContentType)
+import Network.CGI.RFC822Headers (showContentType)
 import Network.CGI.Monad
 import Network.CGI.Protocol
 import Network.CGI.Compat

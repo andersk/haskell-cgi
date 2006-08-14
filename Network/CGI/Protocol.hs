@@ -45,7 +45,7 @@ import System.IO (Handle, hPutStrLn, stderr, hFlush)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
 
-import Network.Multipart
+import Network.CGI.Multipart
 
 
 

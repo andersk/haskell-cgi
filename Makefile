@@ -9,7 +9,7 @@ ALL_DIRS = \
 
 PACKAGE = cgi
 VERSION = 2006.8.14
-PACKAGE_DEPS = base, network, parsec, mtl, xhtml
+PACKAGE_DEPS = base network parsec mtl xhtml
 
 SRC_HC_OPTS += -Wall
 
