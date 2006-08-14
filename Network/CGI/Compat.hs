@@ -48,7 +48,7 @@ wrapper = run stdin stdout
 
 -- | Compatibility wrapper for the old CGI interface.
 --   Runs a simple CGI server.
---   Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
+--   Note: if using Windows, you might need to wrap 'Network.withSocketsDo' around main.
 pwrapper :: PortID  -- ^ The port to run the server on.
          -> ([(String,String)] -> IO Html)
          -> IO ()
@@ -78,7 +78,7 @@ run inh outh f =
                     html <- liftIO (f (vs++is))
                     return (CGIOutput $ BS.pack $ renderHtml html, [])
 
--- | Note: if using Windows, you might need to wrap 'withSocketsDo' around main.
+-- | Note: if using Windows, you might need to wrap 'Network.withSocketsDo' around main.
 connectToCGIScript :: String -> PortID -> IO ()
 connectToCGIScript host portId
      = do env <- getCGIVars

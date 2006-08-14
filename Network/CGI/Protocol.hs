@@ -114,7 +114,7 @@ hRunCGI env hin hout f =
        liftIO $ BS.hPut hout outp
        liftIO $ hFlush hout
 
--- | Run a CGI action in a given environment, using a 'FastString'
+-- | Run a CGI action in a given environment, using a 'ByteString'
 --   for input and a lazy string for output. 
 runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
