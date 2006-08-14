@@ -1,17 +1,5 @@
 This is a Haskell library for writing CGI programs.
 
-Requirements:
-
-GHC 6.4 or later. Not yet tested with other Haskell implementations.
-
-The FastPackedString package, available from
-http://www.cse.unsw.edu.au/~dons/fps.html
-Some recent additions to FastPackedString are used,
-so at the moment you need the current darcs version.
-
-The Haskell XHtml combinator library from
-http://www.cs.chalmers.se/~bringert/darcs/haskell-xhtml/doc/
-
 Installation:
 
 $ runghc Setup.hs configure
