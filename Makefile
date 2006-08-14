@@ -8,10 +8,10 @@ ALL_DIRS = \
 	Network/CGI
 
 PACKAGE = cgi
-VERSION = 2006.08.14
-PACKAGE_DEPS = base
+VERSION = 2006.8.14
+PACKAGE_DEPS = base, network, parsec, mtl, xhtml
 
-SRC_HC_OPTS += -fglasgow-exts
+SRC_HC_OPTS += -Wall
 
 SRC_HADDOCK_OPTS += -t "Haskell Hierarchical Libraries ($(PACKAGE) package)"
 
