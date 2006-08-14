@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fallow-overlapping-instances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.NewCGI
