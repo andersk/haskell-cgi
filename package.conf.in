@@ -1,0 +1,19 @@
+name:		PACKAGE
+version:	VERSION
+license:	BSD3
+maintainer:	bjorn@bringert.net
+exposed:	True
+
+exposed-modules:
+	Network.CGI,
+        Network.CGI.Monad,
+	Network.CGI.Protocol
+
+import-dirs:	IMPORT_DIR
+library-dirs:	LIB_DIR
+hs-libraries:   "HScgi"
+
+depends:	base, network, parsec, mtl, xhtml
+
+haddock-interfaces:	HADDOCK_IFACE
+haddock-html:		HTML_DIR
