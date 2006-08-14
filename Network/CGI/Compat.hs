@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.NewCGI
+-- Module      :  Network.CGI.Compat
 -- Copyright   :  (c) The University of Glasgow 2001
 --                (c) Bjorn Bringert 2004-2006
 --                (c) Ian Lynagh 2005
@@ -15,7 +15,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Network.NewCGI.Compat (
+module Network.CGI.Compat (
     Html, wrapper, pwrapper, connectToCGIScript
   ) where
 
@@ -35,7 +35,7 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Text.XHtml (Html, renderHtml)
 
-import Network.NewCGI.Protocol
+import Network.CGI.Protocol
 
 
 {-# DEPRECATED wrapper, pwrapper, connectToCGIScript "Use the new interface." #-}

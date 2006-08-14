@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.NewCGI.Protocol
+-- Module      :  Network.CGI.Protocol
 -- Copyright   :  (c) Bjorn Bringert 2006
 -- License     :  BSD-style
 --
@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Network.NewCGI.Protocol (
+module Network.CGI.Protocol (
   -- * CGI request
   CGIRequest(..), Input(..), 
   -- * CGI response

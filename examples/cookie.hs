@@ -1,4 +1,4 @@
-import Network.NewCGI
+import Network.CGI
 import Text.XHtml
 
 setCounterCookie :: Int -> CGI ()

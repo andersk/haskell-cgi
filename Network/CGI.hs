@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fallow-overlapping-instances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.NewCGI
+-- Module      :  Network.CGI
 -- Copyright   :  (c) The University of Glasgow 2001
 --                (c) Bjorn Bringert 2004-2006
 --                (c) Ian Lynagh 2005
@@ -27,7 +27,7 @@
 -- Here is a simple example, including error handling (not that there is 
 -- much that can go wrong with Hello World):
 --
--- > import Network.NewCGI
+-- > import Network.CGI
 -- >
 -- > cgiMain :: CGI CGIResult
 -- > cgiMain = output "Hello World!"
@@ -38,7 +38,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Network.NewCGI (
+module Network.CGI (
   -- * CGI monad
     MonadCGI, CGIT, CGIResult, CGI
   , MonadIO, liftIO
@@ -67,7 +67,7 @@ module Network.NewCGI (
   -- * URL encoding
   , formEncode, urlEncode, formDecode, urlDecode
   -- * Compatibility with the old API
-  , module Network.NewCGI.Compat
+  , module Network.CGI.Compat
   ) where
 
 import Control.Exception (Exception(..))
@@ -82,12 +82,12 @@ import System.IO.Error (isUserError, ioeGetErrorString)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
 
-import Network.HTTP.Cookie (Cookie(..), showCookie, newCookie, findCookie)
-import qualified Network.HTTP.Cookie as Cookie (deleteCookie)
+import Network.CGI.Cookie (Cookie(..), showCookie, newCookie, findCookie)
+import qualified Network.CGI.Cookie as Cookie (deleteCookie)
 import Network.RFC822Headers (showContentType)
-import Network.NewCGI.Monad
-import Network.NewCGI.Protocol
-import Network.NewCGI.Compat
+import Network.CGI.Monad
+import Network.CGI.Protocol
+import Network.CGI.Compat
 
 import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++), 
                    body, h1, paragraph, hr, address)

@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.HTTP.Cookie
+-- Module      :  Network.CGI.Cookie
 -- Copyright   :  (c) Bjorn Bringert 2004-2005
 --                (c) Ian Lynagh 2005
 -- License     :  BSD-style
@@ -19,7 +19,7 @@
 -- * Update for RFC2109 <http://www.ietf.org/rfc/rfc2109.txt>
 --
 -----------------------------------------------------------------------------
-module Network.HTTP.Cookie (
+module Network.CGI.Cookie (
                             Cookie(..)
                             , newCookie
                             , findCookie, deleteCookie

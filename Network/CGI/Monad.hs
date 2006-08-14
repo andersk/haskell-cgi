@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances -fallow-overlapping-instances #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.NewCGI.Monad
+-- Module      :  Network.CGI.Monad
 -- Copyright   :  (c) Bjorn Bringert 2006
 -- License     :  BSD-style
 --
@@ -15,7 +15,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Network.NewCGI.Monad (
+module Network.CGI.Monad (
   -- * CGI monad class
   MonadCGI(..), 
   -- * CGI monad transformer
@@ -33,7 +33,7 @@ import Control.Monad.Writer (WriterT(..), tell)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
 import Data.Monoid (mempty)
 
-import Network.NewCGI.Protocol
+import Network.CGI.Protocol
 
 
 --

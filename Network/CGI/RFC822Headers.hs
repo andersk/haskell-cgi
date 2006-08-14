@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.RFC822Headers
+-- Module      :  Network.CGI.RFC822Headers
 -- Copyright   :  (c) Peter Thiemann 2001,2002
 --                (c) Bjorn Bringert 2005-2006
 -- License     :  BSD-style
@@ -13,7 +13,7 @@
 -- Partly based on code from WASHMail.
 --
 -----------------------------------------------------------------------------
-module Network.RFC822Headers (
+module Network.CGI.RFC822Headers (
                               -- * Headers
                               Header, 
                               pHeader,

@@ -1,6 +1,6 @@
 -- Prints the values of all CGI variables and inputs.
 
-import Network.NewCGI
+import Network.CGI
 
 import Data.List (intersperse)
 
