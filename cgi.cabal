@@ -8,7 +8,7 @@ Homepage: http://www.cs.chalmers.se/~bringert/darcs/haskell-cgi/doc/
 License: BSD3
 License-file: LICENSE
 Build-depends: base, network, parsec, mtl, xhtml
-Extensions: 
+Extensions: OverlappingInstances, UndecidableInstances
 Synopsis: A Haskell library for writing CGI programs
 Description:
  This is a Haskell library for writing CGI programs. 
