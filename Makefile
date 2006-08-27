@@ -15,4 +15,6 @@ SRC_HC_OPTS += -Wall
 
 SRC_HADDOCK_OPTS += -t "Haskell Hierarchical Libraries ($(PACKAGE) package)"
 
+EXCLUDED_SRCS += Setup.hs
+
 include $(TOP)/mk/target.mk
