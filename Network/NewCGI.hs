@@ -12,7 +12,7 @@
 -- programs which use the old Network.NewCGI module name.
 --
 -- This module is deprecated and will be removed in the future.
--- Use 'Network.CGI' instead.
+-- Use "Network.CGI" instead.
 --
 -----------------------------------------------------------------------------
 
