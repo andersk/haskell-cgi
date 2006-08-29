@@ -1,5 +1,5 @@
 Name: cgi
-Version: 2006.8.27
+Version: 2006.8.29
 Copyright: Bjorn Bringert, Andy Gill, Ian Lynagh, Erik Meijer, 
            Sven Panne, Jeremy Shaw
 Maintainer: bjorn@bringert.net
@@ -28,7 +28,8 @@ Exposed-Modules:
    Network.CGI.Compat,
    Network.CGI.Multipart,
    Network.CGI.RFC822Headers,
-   Network.CGI.Cookie
+   Network.CGI.Cookie,
+   Network.NewCGI
 ghc-options: -O2 -Wall
 
 --Executable:     printinput
