@@ -7,7 +7,7 @@ Author: Bjorn Bringert
 Homepage: http://www.cs.chalmers.se/~bringert/darcs/haskell-cgi/doc/
 License: BSD3
 License-file: LICENSE
-Build-depends: base, network, parsec, mtl, xhtml
+Build-depends:  base, network, parsec, mtl, xhtml, fps
 Extensions: OverlappingInstances, UndecidableInstances
 Synopsis: A Haskell library for writing CGI programs
 Description:
@@ -22,7 +22,6 @@ Description:
  - Wrapper functions for compatibility with the existing
    Network.CGI module.
 Exposed-Modules: 
-   Network.CGI,
    Network.CGI.Monad,
    Network.CGI.Protocol,
    Network.CGI.Compat,
