@@ -1,7 +1,14 @@
 This is a Haskell library for writing CGI programs.
 
-Installation:
+Installation with network >= 2.0:
 
+$ runghc Setup.hs configure
+$ runghc Setup.hs build
+$ runghc Setup.hs install
+
+Installation with network < 2.0:
+
+$ sh old-libs-compat.sh
 $ runghc Setup.hs configure
 $ runghc Setup.hs build
 $ runghc Setup.hs install
