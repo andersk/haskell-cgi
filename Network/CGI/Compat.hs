@@ -76,7 +76,7 @@ run inh outh f =
   where f' req = do let vs = Map.toList (cgiVars req) 
                         is = [ (n,BS.unpack (inputValue i)) | (n,i) <- cgiInputs req ]
                     html <- liftIO (f (vs++is))
-                    return (CGIOutput $ BS.pack $ renderHtml html, [])
+                    return ([], CGIOutput $ BS.pack $ renderHtml html)
 
 -- | Note: if using Windows, you might need to wrap 'Network.withSocketsDo' around main.
 connectToCGIScript :: String -> PortID -> IO ()

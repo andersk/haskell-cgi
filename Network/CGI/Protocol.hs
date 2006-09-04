@@ -106,7 +106,7 @@ hRunCGI :: MonadIO m =>
            [(String,String)] -- ^ CGI environment variables.
         -> Handle -- ^ Handle that input will be read from.
         -> Handle -- ^ Handle that output will be written to.
-        -> (CGIRequest -> m (CGIResult, Headers)) -- ^ CGI action
+        -> (CGIRequest -> m (Headers, CGIResult)) -- ^ CGI action
         -> m ()
 hRunCGI env hin hout f = 
     do inp <- liftIO $ BS.hGetContents hin
@@ -119,10 +119,10 @@ hRunCGI env hin hout f =
 runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
           -> ByteString -- ^ Request body.
-          -> (CGIRequest -> m (CGIResult, Headers)) -- ^ CGI action.
+          -> (CGIRequest -> m (Headers, CGIResult)) -- ^ CGI action.
           -> m ByteString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
-    = do (outp,hs) <- f $ CGIRequest {
+    = do (hs,outp) <- f $ CGIRequest {
                                       cgiVars = Map.fromList vars,
                                       cgiInputs = decodeInput vars inp,
                                       cgiRequestBody = inp

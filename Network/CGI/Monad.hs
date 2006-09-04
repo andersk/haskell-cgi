@@ -80,8 +80,8 @@ instance (MonadTrans t, MonadCGI m, Monad (t m)) => MonadCGI (t m) where
     cgiGet = lift . cgiGet
 
 -- | Run a CGI action.
-runCGIT :: CGIT m a -> CGIRequest -> m (a, Headers)
-runCGIT (CGIT c) r = runWriterT $ runReaderT c r
+runCGIT :: Monad m => CGIT m a -> CGIRequest -> m (Headers, a)
+runCGIT (CGIT c) = liftM (uncurry (flip (,))) . runWriterT . runReaderT c
 
 
 
