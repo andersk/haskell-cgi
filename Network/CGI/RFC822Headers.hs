@@ -99,10 +99,16 @@ p_parameter =
 -- * Content type
 --
 
+-- | A MIME content-type value.
+--   The 'Show' instance is derived automatically.
+--   Use 'showContentType' to obtain the standard
+--   string representation.
 data ContentType = 
 	ContentType String String [(String, String)]
     deriving (Show, Read, Eq, Ord)
 
+-- | Produce the standard string representation of a content-type,
+--   e.g. \"text\/html; charset=ISO-8859-1\".
 showContentType :: ContentType -> String
 showContentType (ContentType x y ps) = x ++ "/" ++ y ++ showParameters ps
 
@@ -115,6 +121,7 @@ pContentType =
      c_parameters <- many p_parameter
      return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
 
+-- | Parse the standard representation of a content-type.
 parseContentType :: Monad m => String -> m ContentType
 parseContentType = parseM pContentType "Content-type"
 
