@@ -29,7 +29,7 @@ module Network.CGI.Protocol (
   -- * URL encoding
   formEncode, urlEncode, formDecode, urlDecode,
   -- * Utilities
-  maybeRead
+  maybeRead, replace
  ) where
 
 import Control.Monad.Trans (MonadIO(..))

@@ -67,6 +67,7 @@ module Network.CGI (
   , remoteHost, remoteAddr
   , authType, remoteUser
   , requestContentType, requestContentLength
+  , requestHeader
   -- * Content type
   , ContentType(..), showContentType, parseContentType
   -- * Cookies
@@ -82,6 +83,7 @@ module Network.CGI (
 import Control.Exception (Exception(..))
 import Control.Monad (liftM)
 import Control.Monad.Trans (MonadIO, liftIO)
+import Data.Char (toUpper)
 import Data.List (intersperse, sort, group)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
@@ -321,6 +323,14 @@ requestContentType = getVar "CONTENT_TYPE"
 requestContentLength :: MonadCGI m => m (Maybe Int)
 requestContentLength = liftM (>>= maybeRead) $ getVar "CONTENT_LENGTH"
 
+-- | Gets the value of the request header with the given name.
+--   The header name is case-insensitive.
+--   Example:
+--
+-- > requestHeader "User-Agent"
+requestHeader :: MonadCGI m => String -> m (Maybe String)
+requestHeader name = getVar var
+  where var = "HTTP_" ++ map toUpper (replace '-' '_' name)
 
 --
 -- * Inputs
