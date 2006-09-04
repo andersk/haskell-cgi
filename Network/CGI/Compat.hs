@@ -74,7 +74,7 @@ run inh outh f =
     do env <- getCGIVars
        hRunCGI env inh outh f'
   where f' req = do let vs = Map.toList (cgiVars req) 
-                        is = [ (n,BS.unpack (value i)) | (n,i) <- cgiInputs req ]
+                        is = [ (n,BS.unpack (inputValue i)) | (n,i) <- cgiInputs req ]
                     html <- liftIO (f (vs++is))
                     return (CGIOutput $ BS.pack $ renderHtml html, [])
 

@@ -68,9 +68,9 @@ data CGIRequest =
 
 -- | The value of an input parameter, and some metadata.
 data Input = Input {
-                    value :: ByteString,
-                    filename :: Maybe String,
-                    contentType :: ContentType
+                    inputValue :: ByteString,
+                    inputFilename :: Maybe String,
+                    inputContentType :: ContentType
                    }
               deriving Show
 
@@ -157,9 +157,9 @@ decodeInput env inp = queryInput env ++ bodyInput env inp
 
 -- | Build an 'Input' object for a simple value.
 simpleInput :: String -> Input
-simpleInput v = Input { value = BS.pack v,
-                        filename = Nothing,
-                        contentType = defaultInputType }
+simpleInput v = Input { inputValue = BS.pack v,
+                        inputFilename = Nothing,
+                        inputContentType = defaultInputType }
 
 -- | The default content-type for variables.
 defaultInputType :: ContentType
@@ -282,9 +282,9 @@ bodyPartToInput (BodyPart hs b) =
     case getContentDisposition hs of
               Just (ContentDisposition "form-data" ps) -> 
                   (lookupOrNil "name" ps,
-                   Input { value = b,
-                           filename = lookup "filename" ps,
-                           contentType = ctype })
+                   Input { inputValue = b,
+                           inputFilename = lookup "filename" ps,
+                           inputContentType = ctype })
               _ -> ("ERROR",simpleInput "ERROR") -- FIXME: report error
     where ctype = fromMaybe defaultInputType (getContentType hs)
 

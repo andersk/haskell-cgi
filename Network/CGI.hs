@@ -255,14 +255,14 @@ getInput :: MonadCGI m =>
             String           -- ^ The name of the variable.
          -> m (Maybe String) -- ^ The value of the variable,
                              --   or Nothing, if it was not set.
-getInput = liftM (fmap inputValue) . getInput_
+getInput = liftM (fmap BS.unpack) . getInputFPS
 
 -- | Like 'getInput', but returns a 'ByteString'.
 getInputFPS :: MonadCGI m =>
             String           -- ^ The name of the variable.
          -> m (Maybe ByteString) -- ^ The value of the variable,
                              --   or Nothing, if it was not set.
-getInputFPS = liftM (fmap value) . getInput_
+getInputFPS = liftM (fmap inputValue) . getInput_
 
 -- | Get all the values of an input variable, for example from a form.
 -- This can be used to get all the values from form controls
@@ -275,21 +275,22 @@ getMultiInput :: MonadCGI m =>
               -> m [String] -- ^ The values of the variable,
                             -- or the empty list if the variable was not set.
 getMultiInput n = do is <- cgiGet cgiInputs
-                     return [inputValue v | (p,v) <- is, p == n]
+                     return [BS.unpack (inputValue v) | (p,v) <- is, p == n]
 
 -- | Get the file name of an input.
 getInputFilename :: MonadCGI m =>
                     String           -- ^ The name of the variable.
                  -> m (Maybe String) -- ^ The file name corresponding to the
                                      -- input, if there is one.
-getInputFilename = liftM (>>= filename) . getInput_
+getInputFilename = liftM (>>= inputFilename) . getInput_
 
 -- | Get the content-type of an input, if the input exists, e.g. "image\/jpeg".
 --   For non-file inputs, this function returns "text\/plain".
 getInputContentType :: MonadCGI m =>
                        String   -- ^ The name of the variable.
                     -> m (Maybe String) -- ^ The content type, formatted as a string.
-getInputContentType = liftM (fmap (showContentType . contentType)) . getInput_
+getInputContentType = 
+    liftM (fmap (showContentType . inputContentType)) . getInput_
 
 -- | Same as 'getInput', but tries to read the value to the desired type.
 readInput :: (Read a, MonadCGI m) =>
@@ -304,7 +305,7 @@ readInput = liftM (>>= maybeRead) . getInput
 --   if there are several values for the name.
 getInputs :: MonadCGI m => m [(String,String)]
 getInputs = do is <- cgiGet cgiInputs
-               return [ (n,inputValue i) | (n,i) <- is ]
+               return [ (n, BS.unpack (inputValue i)) | (n,i) <- is ]
 
 -- | Get the names of all input variables.
 getInputNames :: MonadCGI m => m [String]
@@ -312,9 +313,6 @@ getInputNames = (sortNub . map fst) `liftM` cgiGet cgiInputs
     where sortNub = map head . group . sort
 
 -- Internal stuff
-
-inputValue :: Input -> String
-inputValue = BS.unpack . value
 
 getInput_ ::  MonadCGI m => String -> m (Maybe Input)
 getInput_ n = lookup n `liftM` cgiGet cgiInputs
