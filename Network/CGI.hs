@@ -59,7 +59,16 @@ module Network.CGI (
   , getInputs, getInputNames
   , getMultiInput
   , getInputFilename, getInputContentType
-  , getVar, getVars
+  -- * Environment
+  , getVar, getVarWithDefault, getVars
+  , serverName, serverPort
+  , requestMethod, pathInfo
+  , pathTranslated, scriptName
+  , remoteHost, remoteAddr
+  , authType, remoteUser
+  , requestContentType, requestContentLength
+  -- * Content type
+  , ContentType(..), showContentType, parseContentType
   -- * Cookies
   , Cookie(..), newCookie
   , getCookie, readCookie
@@ -84,7 +93,8 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Network.CGI.Cookie (Cookie(..), showCookie, newCookie, findCookie)
 import qualified Network.CGI.Cookie as Cookie (deleteCookie)
-import Network.CGI.RFC822Headers (showContentType)
+import Network.CGI.RFC822Headers (ContentType(..), 
+                                  parseContentType, showContentType)
 import Network.CGI.Monad
 import Network.CGI.Protocol
 import Network.CGI.Compat
@@ -236,10 +246,80 @@ getVar :: MonadCGI m =>
        -> m (Maybe String)
 getVar name = liftM (Map.lookup name) $ cgiGet cgiVars
 
+getVarWithDefault :: MonadCGI m =>
+                     String -- ^ The name of the variable.
+                  -> String -- ^ Default value 
+                  -> m String
+getVarWithDefault name def = liftM (fromMaybe def) $ getVar name
+
 -- | Get all CGI environment variables and their values.
 getVars :: MonadCGI m =>
            m [(String,String)]
 getVars = liftM Map.toList $ cgiGet cgiVars
+
+
+-- | The server\'s hostname, DNS alias, or IP address as it would 
+--   appear in self-referencing URLs.
+serverName :: MonadCGI m => m String
+serverName = getVarWithDefault "SERVER_NAME" ""
+
+-- | The port number to which the request was sent.
+serverPort :: MonadCGI m => m Int
+serverPort = liftM (fromMaybe 80 . (>>= maybeRead)) (getVar "SERVER_PORT")
+
+-- |  The method with which the request was made. 
+--    For HTTP, this is \"GET\", \"HEAD\", \"POST\", etc.
+requestMethod :: MonadCGI m => m String
+requestMethod = getVarWithDefault "REQUEST_METHOD" "GET"
+
+-- | The extra path information, as given by the client.
+--   This is any part of the request path that follows the
+--   CGI program path.
+pathInfo :: MonadCGI m => m String
+pathInfo = getVarWithDefault "PATH_INFO" ""
+
+-- | The path returned by 'pathInfo', but with any virtual-to-physical
+--   mapping applied to it.
+pathTranslated :: MonadCGI m => m String
+pathTranslated = getVarWithDefault "PATH_TRANSLATED" ""
+
+-- | A virtual path to the script being executed, 
+--   used for self-referencing URLs.
+scriptName :: MonadCGI m => m String
+scriptName = getVarWithDefault "SCRIPT_NAME" ""
+
+-- | The hostname making the request. If the server does not have
+--   this information, Nothing is returned. See also 'remoteAddr'.
+remoteHost :: MonadCGI m => m (Maybe String)
+remoteHost = getVar "REMOTE_HOST"
+
+-- | The IP address of the remote host making the request.
+remoteAddr :: MonadCGI m => m String
+remoteAddr = getVarWithDefault "REMOTE_ADDR" ""
+
+-- | If the server supports user authentication, and the script is 
+-- protected, this is the protocol-specific authentication method 
+-- used to validate the user.
+authType :: MonadCGI m => m (Maybe String)
+authType = getVar "AUTH_TYPE"
+
+-- | If the server supports user authentication, and the script is 
+--   protected, this is the username they have authenticated as.
+remoteUser :: MonadCGI m => m (Maybe String)
+remoteUser = getVar "REMOTE_USER"
+
+-- | For queries which have attached information, such as 
+--   HTTP POST and PUT, this is the content type of the data.
+--   You can use 'parseContentType' to get a structured
+--   representation of the the content-type value.
+requestContentType :: MonadCGI m => m (Maybe String)
+requestContentType = getVar "CONTENT_TYPE"
+
+-- | For queries which have attached information, such as 
+--   HTTP POST and PUT, this is the length of the content 
+--   given by the client.
+requestContentLength :: MonadCGI m => m (Maybe Int)
+requestContentLength = liftM (>>= maybeRead) $ getVar "CONTENT_LENGTH"
 
 
 --
@@ -286,6 +366,8 @@ getInputFilename = liftM (>>= inputFilename) . getInput_
 
 -- | Get the content-type of an input, if the input exists, e.g. "image\/jpeg".
 --   For non-file inputs, this function returns "text\/plain".
+--   You can use 'parseContentType' to get a structured
+--   representation of the the content-type value.
 getInputContentType :: MonadCGI m =>
                        String   -- ^ The name of the variable.
                     -> m (Maybe String) -- ^ The content type, formatted as a string.
