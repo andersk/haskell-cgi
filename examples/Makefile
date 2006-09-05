@@ -1,7 +1,7 @@
 PROGS = upload.cgi printinput.cgi redirect.cgi hello.cgi \
         cookie.cgi error.cgi testenv.cgi
 
-GHCFLAGS = -package cgi -fwarn-unused-imports
+GHCFLAGS = -package cgi -fwarn-unused-imports -fallow-overlapping-instances
 
 .PHONY: all clean
 
