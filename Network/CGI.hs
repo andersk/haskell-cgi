@@ -69,6 +69,8 @@ module Network.CGI (
   , authType, remoteUser
   , requestContentType, requestContentLength
   , requestHeader
+  -- * Program and request URI
+  , progURI, queryURI, requestURI
   -- * Content type
   , ContentType(..), showContentType, parseContentType
   -- * Cookies
@@ -88,6 +90,7 @@ import Data.Char (toUpper)
 import Data.List (intersperse, sort, group)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
+import Network.URI (URI(..), URIAuth(..), nullURI, parseRelativeReference)
 import System.IO (stdin, stdout)
 import System.IO.Error (isUserError, ioeGetErrorString)
 
@@ -342,6 +345,61 @@ requestContentLength = liftM (>>= maybeRead) $ getVar "CONTENT_LENGTH"
 requestHeader :: MonadCGI m => String -> m (Maybe String)
 requestHeader name = getVar var
   where var = "HTTP_" ++ map toUpper (replace '-' '_' name)
+
+
+--
+-- * Program and request URI
+--
+
+-- | Returns the 'URI' of this script. This does not include
+--   and extra path information or query parameters. See
+--   'queryURI' for that.
+--   If the server is rewriting request URIs, this URI can
+--   be different from the one requested by the client.
+--   See 'requestURI' for the URI requested by the client.
+progURI :: CGI URI
+progURI =
+    do host <- serverName
+       port <- serverPort
+       name <- scriptName
+       let scheme = if port == 443 then "https:" else "http:"
+           auth = URIAuth { uriUserInfo = "",
+                            uriRegName = host,
+                            uriPort = if port == 80 || port == 443 
+                                       then "" else ":"++show port }
+       return $ nullURI { uriScheme = scheme, 
+                          uriAuthority = Just auth,
+                          uriPath = name }
+
+-- | Like 'progURI', but the returned 'URI' also includes
+--   any extra path information, and any query parameters.
+--   If the server is rewriting request URIs, this URI can
+--   be different from the one requested by the client.
+--   See 'requestURI' to get the URI requested by the client.
+queryURI :: CGI URI
+queryURI = 
+    do uri  <- progURI
+       path <- pathInfo
+       qs   <- queryString
+       return $ uri { uriPath = uriPath uri ++ path, uriQuery = qs } 
+
+-- | Attempts to reconstruct the URI requested by the client,
+--   including extra path information and query parameters.
+--   If no request URI rewriting is done, or if the web server does not
+--   provide the information needed to reconstruct the request URI,
+--   this function returns the same value as 'queryURI'.
+requestURI :: CGI URI
+requestURI =
+    do uri <- queryURI
+       -- Apache sets REQUEST_URI to the original request URI
+       mreq <- liftM (>>= parseRelativeReference) $ getVar "REQUEST_URI"
+       return $ case mreq of
+                 Nothing  -> uri
+                 Just req -> uri { 
+                                  uriPath  = uriPath req,
+                                  uriQuery = uriQuery req
+                                 }
+
 
 --
 -- * Inputs
