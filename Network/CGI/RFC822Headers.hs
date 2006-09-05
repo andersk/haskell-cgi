@@ -99,12 +99,28 @@ p_parameter =
 -- * Content type
 --
 
--- | A MIME content-type value.
+-- | A MIME media type value.
 --   The 'Show' instance is derived automatically.
 --   Use 'showContentType' to obtain the standard
 --   string representation.
+--   See <http://www.ietf.org/rfc/rfc2046.txt> for more
+--   information about MIME media types.
 data ContentType = 
-	ContentType String String [(String, String)]
+	ContentType {
+                     -- | The top-level media type, the general type
+                     --   of the data. Common examples are
+                     --   \"text\", \"image\", \"audio\", \"video\",
+                     --   \"multipart\", and \"application\".
+                     ctType :: String,
+                     -- | The media subtype, the specific data format.
+                     --   Examples include \"plain\", \"html\",
+                     --   \"jpeg\", \"form-data\", etc.
+                     ctSubtype :: String,
+                     -- | Media type parameters. On common example is
+                     --   the charset parameter for the \"text\" 
+                     --   top-level type, e.g. @(\"charset\",\"ISO-8859-1\")@.
+                     ctParamaters :: [(String, String)]
+                    }
     deriving (Show, Read, Eq, Ord)
 
 -- | Produce the standard string representation of a content-type,
@@ -122,6 +138,8 @@ pContentType =
      return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
 
 -- | Parse the standard representation of a content-type.
+--   If the input cannot be parsed, this function calls
+--   'fail' with a (hopefully) informative error message.
 parseContentType :: Monad m => String -> m ContentType
 parseContentType = parseM pContentType "Content-type"
 
