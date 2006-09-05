@@ -15,6 +15,7 @@ page = liftM defList $ sequence
         f "pathInfo"             pathInfo,
         f "pathTranslated"       pathTranslated,
         f "scriptName"           scriptName,
+        f "queryString"          queryString,
         f "remoteHost"           remoteHost,
         f "remoteAddr"           remoteAddr,
         f "authType"             authType,
