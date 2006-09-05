@@ -34,7 +34,10 @@ envFuns = sequence
         f "remoteUser"           remoteUser,
         f "requestContentType"   requestContentType ,
         f "requestContentLength" requestContentLength,
-        f "requestHeader \"User-Agent\"" (requestHeader "User-Agent")
+        f "requestHeader \"User-Agent\"" (requestHeader "User-Agent"),
+        f "progURI"              progURI,
+        f "queryURI"             queryURI,
+        f "requestURI"           requestURI
        ]
   where f n = liftM (((,) n) . show)
 
