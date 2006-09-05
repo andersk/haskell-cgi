@@ -64,6 +64,7 @@ module Network.CGI (
   , serverName, serverPort
   , requestMethod, pathInfo
   , pathTranslated, scriptName
+  , queryString
   , remoteHost, remoteAddr
   , authType, remoteUser
   , requestContentType, requestContentLength
@@ -289,6 +290,13 @@ pathTranslated = getVarWithDefault "PATH_TRANSLATED" ""
 --   used for self-referencing URLs.
 scriptName :: MonadCGI m => m String
 scriptName = getVarWithDefault "SCRIPT_NAME" ""
+
+-- | The information which follows the ? in the URL which referenced 
+--   this program. This is the encoded query information.
+--   For most normal uses, 'getInput' and friends are probably
+--   more convenient.
+queryString :: MonadCGI m => m String
+queryString = getVarWithDefault "QUERY_STRING" ""
 
 -- | The hostname making the request. If the server does not have
 --   this information, Nothing is returned. See also 'remoteAddr'.
