@@ -278,8 +278,11 @@ requestMethod = getVarWithDefault "REQUEST_METHOD" "GET"
 -- | The extra path information, as given by the client.
 --   This is any part of the request path that follows the
 --   CGI program path.
+--   If the string returned by this function is not empty,
+--   it is guaranteed to start with a @\'\/\'@.
 pathInfo :: MonadCGI m => m String
-pathInfo = getVarWithDefault "PATH_INFO" ""
+pathInfo = liftM slash $ getVarWithDefault "PATH_INFO" ""
+  where slash s = if not (null s) && head s /= '/' then '/':s else s
 
 -- | The path returned by 'pathInfo', but with any virtual-to-physical
 --   mapping applied to it.
