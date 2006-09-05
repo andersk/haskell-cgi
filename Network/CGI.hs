@@ -351,12 +351,13 @@ requestHeader name = getVar var
 -- * Program and request URI
 --
 
--- | Returns the 'URI' of this script. This does not include
---   and extra path information or query parameters. See
+-- | Attempts to reconstruct the absolute URI of this program. 
+--   This does not include
+--   any extra path information or query parameters. See
 --   'queryURI' for that.
 --   If the server is rewriting request URIs, this URI can
 --   be different from the one requested by the client.
---   See 'requestURI' for the URI requested by the client.
+--   See also 'requestURI'.
 progURI :: CGI URI
 progURI =
     do host <- serverName
@@ -375,15 +376,15 @@ progURI =
 --   any extra path information, and any query parameters.
 --   If the server is rewriting request URIs, this URI can
 --   be different from the one requested by the client.
---   See 'requestURI' to get the URI requested by the client.
+--   See also 'requestURI'.
 queryURI :: CGI URI
 queryURI = 
     do uri  <- progURI
        path <- pathInfo
-       qs   <- queryString
+       qs   <- liftM (\q -> if null q then q else '?':q) $ queryString
        return $ uri { uriPath = uriPath uri ++ path, uriQuery = qs } 
 
--- | Attempts to reconstruct the URI requested by the client,
+-- | Attempts to reconstruct the absolute URI requested by the client,
 --   including extra path information and query parameters.
 --   If no request URI rewriting is done, or if the web server does not
 --   provide the information needed to reconstruct the request URI,
