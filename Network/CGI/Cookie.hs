@@ -82,9 +82,9 @@ newCookie name value = Cookie { cookieName = name,
 -- * Getting and setting cookies
 --
 
--- | Get the value of a cookie from a semicolon separated list of
---   name-value pairs such as that in the value of the Cookie: header
---   or the HTTP_COOKIE CGI variable.
+-- | Get the value of a cookie from a string on the form
+--   @\"cookieName1=cookieValue1;...;cookieName2=cookieValue2\"@.
+--   This is the format of the @Cookie@ HTTP header.
 findCookie :: String -- ^ Cookie name
            -> String -- ^ Semicolon separated list of name-value pairs
            -> Maybe String  -- ^ Cookie value, if found
