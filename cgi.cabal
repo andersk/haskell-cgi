@@ -28,8 +28,7 @@ Exposed-Modules:
    Network.CGI.Compat,
    Network.CGI.Multipart,
    Network.CGI.RFC822Headers,
-   Network.CGI.Cookie,
-   Network.NewCGI
+   Network.CGI.Cookie
 ghc-options: -O2 -Wall
 
 --Executable:     printinput

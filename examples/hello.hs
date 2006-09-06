@@ -1,4 +1,4 @@
-import Network.NewCGI
+import Network.CGI
 
 cgiMain :: CGI CGIResult
 cgiMain = output "Hello World!"

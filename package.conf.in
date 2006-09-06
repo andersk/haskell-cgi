@@ -7,8 +7,7 @@ exposed:	True
 exposed-modules:
 	Network.CGI,
         Network.CGI.Monad,
-	Network.CGI.Protocol,
-	Network.NewCGI
+	Network.CGI.Protocol
 
 import-dirs:	IMPORT_DIR
 library-dirs:	LIB_DIR

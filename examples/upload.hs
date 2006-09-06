@@ -6,7 +6,7 @@ import Control.Monad (liftM)
 import Data.Maybe (fromJust)
 
 import qualified Data.ByteString.Lazy as BS
-import Network.NewCGI
+import Network.CGI
 import Text.XHtml
 
 dir = "../upload"
