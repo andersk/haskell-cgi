@@ -358,7 +358,7 @@ requestHeader name = getVar var
 --   If the server is rewriting request URIs, this URI can
 --   be different from the one requested by the client.
 --   See also 'requestURI'.
-progURI :: CGI URI
+progURI :: MonadCGI m => m URI
 progURI =
     do host <- serverName
        port <- serverPort
@@ -377,7 +377,7 @@ progURI =
 --   If the server is rewriting request URIs, this URI can
 --   be different from the one requested by the client.
 --   See also 'requestURI'.
-queryURI :: CGI URI
+queryURI :: MonadCGI m => m URI
 queryURI = 
     do uri  <- progURI
        path <- pathInfo
@@ -389,7 +389,7 @@ queryURI =
 --   If no request URI rewriting is done, or if the web server does not
 --   provide the information needed to reconstruct the request URI,
 --   this function returns the same value as 'queryURI'.
-requestURI :: CGI URI
+requestURI :: MonadCGI m => m URI
 requestURI =
     do uri <- queryURI
        -- Apache sets REQUEST_URI to the original request URI
