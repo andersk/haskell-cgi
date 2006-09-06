@@ -1,14 +1,11 @@
-This is a Haskell library for writing CGI programs.
+This is a Haskell library for writing CGI programs. 
+Its features include:
 
-Installation with network >= 2.0:
-
-$ runghc Setup.hs configure
-$ runghc Setup.hs build
-$ runghc Setup.hs install
-
-Installation with network < 2.0:
-
-$ sh mk-cgi-compat.sh
-$ runghc Setup.hs configure
-$ runghc Setup.hs build
-$ runghc Setup.hs install
+- Access to CGI parameters (e.g. form input) from
+  both GET and POST requests.
+- Access to CGI environment variables.
+- Ability to set arbitrary response headers.
+- Support for HTTP cookies.
+- Efficient file upload support.
+- Wrapper functions for compatibility with the existing
+  Network.CGI module.
