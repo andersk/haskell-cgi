@@ -38,7 +38,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Network.NewCGI (
+module Network.CGI (
   -- * CGI monad
     MonadCGI, CGIT, CGIResult, CGI
   , MonadIO, liftIO
