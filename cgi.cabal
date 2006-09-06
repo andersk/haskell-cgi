@@ -26,9 +26,10 @@ Exposed-Modules:
    Network.CGI.Monad,
    Network.CGI.Protocol,
    Network.CGI.Compat,
-   Network.CGI.Multipart,
-   Network.CGI.RFC822Headers,
    Network.CGI.Cookie
+Other-modules:
+   Network.CGI.Multipart,
+   Network.CGI.RFC822Headers
 ghc-options: -O2 -Wall
 
 --Executable:     printinput
