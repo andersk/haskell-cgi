@@ -16,6 +16,10 @@
 -- See <http://hoohoo.ncsa.uiuc.edu/cgi/interface.html> for the
 -- CGI specification.
 --
+-- This version of the library is for systems with version 2.0 or greater
+-- of the network package. This includes GHC 6.6 and later. For older
+-- systems, see <http://www.cs.chalmers.se/~bringert/darcs/cgi-compat/doc/>
+--
 -- Based on the original Haskell binding for CGI:
 --
 -- Original Version by Erik Meijer <mailto:erik@cs.ruu.nl>.
