@@ -45,6 +45,8 @@ import System.IO (Handle, hPutStrLn, stderr, hFlush)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
 
+import Data.Typeable (Typeable(..), mkTyConApp, mkTyCon)
+
 import Network.CGI.Multipart
 
 
@@ -64,7 +66,10 @@ data CGIRequest =
                 -- | Raw request body. 
                 cgiRequestBody :: ByteString
                }
-    deriving Show
+    deriving (Show)
+
+instance Typeable CGIResult where
+    typeOf _ = mkTyConApp (mkTyCon "Network.CGI.Protocol.CGIResult") []
 
 -- | The value of an input parameter, and some metadata.
 data Input = Input {

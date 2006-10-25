@@ -32,6 +32,8 @@ import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Writer (WriterT(..), tell)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
 import Data.Monoid (mempty)
+import Data.Typeable (Typeable(..), Typeable1(..), 
+                      mkTyConApp, mkTyCon)
 
 import Network.CGI.Protocol
 
@@ -45,6 +47,10 @@ type CGI a = CGIT IO a
 
 -- | The CGIT monad transformer.
 newtype CGIT m a = CGIT { unCGIT :: ReaderT CGIRequest (WriterT Headers m) a }
+
+instance (Typeable1 m, Typeable a) => Typeable (CGIT m a) where
+    typeOf _ = mkTyConApp (mkTyCon "Network.CGI.Monad.CGIT") 
+                [typeOf1 (undefined :: m a), typeOf (undefined :: a)]
 
 instance Monad m => Functor (CGIT m) where
     fmap f c = CGIT (fmap f (unCGIT c))
