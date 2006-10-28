@@ -21,6 +21,8 @@ module Network.CGI.Monad (
   -- * CGI monad transformer
   CGIT(..), CGI,
   runCGIT,
+  -- * Request info
+  CGIRequest(..),
   -- * Error handling
   throwCGI, catchCGI, tryCGI, handleExceptionCGI,
  ) where
