@@ -32,7 +32,6 @@ import Data.Maybe (catMaybes)
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import System.Time (CalendarTime(..), Month(..), Day(..),
                     formatCalendarTime)
-import Text.ParserCombinators.Parsec
 
 --
 -- * Types
@@ -140,34 +139,10 @@ showPair name value = name ++ "=" ++ value
 -- | Gets all the cookies from a Cookie: header value
 readCookies :: String             -- ^ String to parse
             -> [(String,String)]  -- ^ Cookie name - cookie value pairs
-readCookies s = case parse parsePairs "" s of
-                                           Left _ -> []
-                                           Right ps -> ps
-
--- | Parse a semicolon-separated sequence of name=value pairs.
-parsePairs :: Parser [(String,String)]
-parsePairs = sepBy parsePair (char ';' >> spaces)
-
--- | Parse a name=value pair
-parsePair :: Parser (String,String)
-parsePair = do
-            spaces
-            name <- many (satisfy isAllowedChar)
-            spaces
-            char '='
-            spaces
-            value <- many (satisfy isAllowedChar)
-            return (name, value)
-
--- | Returns true if the character is allowed unescaped in
---   (the HTTP representation of) cookie names and values.
-isAllowedChar :: Char -> Bool
-isAllowedChar c | isSpace c = False
-isAllowedChar ';' = False
-isAllowedChar '=' = False
-isAllowedChar ',' = False
-isAllowedChar _ = True
-
+readCookies s = 
+    let (xs,ys) = break (=='=') (dropWhile isSpace s)
+        (zs,ws) = break (==';') (dropWhile isSpace (drop 1 ys))
+     in if null xs then [] else (xs,zs):readCookies (drop 1 ws)
 
 --
 -- Utilities
