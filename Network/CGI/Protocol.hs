@@ -105,12 +105,11 @@ instance Ord HeaderName where
 -- * Running CGI actions
 --
 
--- | Run a CGI action. Gets CGI environment variables from
---   the program environment.
+-- | Runs a CGI action in a given environment. Uses Handles for input and output. 
 hRunCGI :: MonadIO m =>
-           [(String,String)] -- ^ CGI environment variables.
-        -> Handle -- ^ Handle that input will be read from.
-        -> Handle -- ^ Handle that output will be written to.
+           [(String,String)] -- ^ CGI environment variables, e.g. from 'getCGIVars'.
+        -> Handle -- ^ Handle that input will be read from, e.g. 'stdin'.
+        -> Handle -- ^ Handle that output will be written to, e.g. 'stdout'.
         -> (CGIRequest -> m (Headers, CGIResult)) -- ^ CGI action
         -> m ()
 hRunCGI env hin hout f = 
@@ -119,8 +118,8 @@ hRunCGI env hin hout f =
        liftIO $ BS.hPut hout outp
        liftIO $ hFlush hout
 
--- | Run a CGI action in a given environment, using a 'ByteString'
---   for input and a lazy string for output. 
+-- | Runs a CGI action in a given environment. Uses lazy ByteStrings 
+--   for input and output.
 runCGIEnvFPS :: Monad m =>
              [(String,String)] -- ^ CGI environment variables.
           -> ByteString -- ^ Request body.
@@ -153,14 +152,14 @@ defaultContentType = "text/html; charset=ISO-8859-1"
 --
 
 
--- | Get and decode the input according to the request
+-- | Gets and decodes the input according to the request
 --   method and the content-type.
 decodeInput :: [(String,String)] -- ^ CGI environment variables.
             -> ByteString        -- ^ Request body.
             -> [(String,Input)]  -- ^ Input variables and values.
 decodeInput env inp = queryInput env ++ bodyInput env inp
 
--- | Build an 'Input' object for a simple value.
+-- | Builds an 'Input' object for a simple value.
 simpleInput :: String -> Input
 simpleInput v = Input { inputValue = BS.pack v,
                         inputFilename = Nothing,
@@ -174,6 +173,7 @@ defaultInputType = ContentType "text" "plain" [] -- FIXME: use some default enco
 -- * Environment variables
 --
 
+-- | Gets the values of all CGI variables from the program environment.
 getCGIVars :: MonadIO m => m [(String,String)]
 getCGIVars = liftIO getEnvironment
 
@@ -181,7 +181,7 @@ getCGIVars = liftIO getEnvironment
 -- * Logging
 --
 
--- | Log some message using the server\'s logging facility.
+-- | Logs some message using the server\'s logging facility.
 -- FIXME: does this have to be more general to support
 -- FastCGI etc? Maybe we should store log messages in the
 -- CGIState?
@@ -192,12 +192,12 @@ logCGI s = liftIO (hPutStrLn stderr s)
 -- * Query string
 --
 
--- | Get inputs from the query string.
+-- | Gets inputs from the query string.
 queryInput :: [(String,String)] -- ^ CGI environment variables.
            -> [(String,Input)] -- ^ Input variables and values.
 queryInput env = formInput $ lookupOrNil "QUERY_STRING" env
 
--- | Decode application\/x-www-form-urlencoded inputs.
+-- | Decodes application\/x-www-form-urlencoded inputs.
 formInput :: String
           -> [(String,Input)] -- ^ Input variables and values.
 formInput qs = [(n, simpleInput v) | (n,v) <- formDecode qs]
@@ -206,25 +206,25 @@ formInput qs = [(n, simpleInput v) | (n,v) <- formDecode qs]
 -- * URL encoding
 --
 
--- | Format name-value pairs as application\/x-www-form-urlencoded.
+-- | Formats name-value pairs as application\/x-www-form-urlencoded.
 formEncode :: [(String,String)] -> String
 formEncode xs = 
     concat $ intersperse "&" [urlEncode n ++ "=" ++ urlEncode v | (n,v) <- xs]
 
--- | Convert a single value to the application\/x-www-form-urlencoded encoding.
+-- | Converts a single value to the application\/x-www-form-urlencoded encoding.
 urlEncode :: String -> String
 urlEncode = replace ' ' '+' . escapeURIString okChar
   where okChar c = c == ' ' || 
                    (isUnescapedInURI c && c `notElem` "&=+")
 
--- | Get the name-value pairs from application\/x-www-form-urlencoded data.
+-- | Gets the name-value pairs from application\/x-www-form-urlencoded data.
 formDecode :: String -> [(String,String)]
 formDecode "" = []
 formDecode s = (urlDecode n, urlDecode (drop 1 v)) : formDecode (drop 1 rs)
     where (nv,rs) = break (=='&') s
           (n,v) = break (=='=') nv
 
--- | Convert a single value from the 
+-- | Converts a single value from the 
 --   application\/x-www-form-urlencoded encoding.
 urlDecode :: String -> String
 urlDecode = unEscapeString . replace '+' ' '
@@ -233,7 +233,7 @@ urlDecode = unEscapeString . replace '+' ' '
 -- * Request content and form-data stuff
 --
 
--- | Get input variables from the body, if any.
+-- | Gets input variables from the body, if any.
 bodyInput :: [(String,String)] -- ^ CGI environment variables.
           -> ByteString        -- ^ Request body.
           -> [(String,Input)]  -- ^ Input variables and values.
@@ -244,7 +244,7 @@ bodyInput env inp =
            in decodeBody ctype $ takeInput env inp
       _ -> []
 
--- | Decode a POST body.
+-- | Decodes a POST body.
 decodeBody :: Maybe ContentType -- ^ Content-type, if any
            -> ByteString        -- ^ Request body
            -> [(String,Input)]  -- ^ Input variables and values.
@@ -259,7 +259,7 @@ decodeBody ctype inp =
                -- No content-type given, assume x-www-form-urlencoded
                Nothing -> formInput (BS.unpack inp)
 
--- | Take the right number of bytes from the input.
+-- | Takes the right number of bytes from the input.
 takeInput :: [(String,String)]  -- ^ CGI environment variables.
           -> ByteString         -- ^ Request body.
           -> ByteString         -- ^ CONTENT_LENGTH bytes from the request 
@@ -271,7 +271,7 @@ takeInput env req =
            Nothing -> BS.empty
      where len = lookup "CONTENT_LENGTH" env >>= maybeRead
 
--- | Decode multipart\/form-data input.
+-- | Decodes multipart\/form-data input.
 multipartDecode :: [(String,String)] -- ^ Content-type parameters
                 -> ByteString        -- ^ Request body
                 -> [(String,Input)]  -- ^ Input variables and values.
@@ -298,7 +298,7 @@ bodyPartToInput (BodyPart hs b) =
 -- * Utilities
 --
 
--- | Replace all instances of a value in a list by another value.
+-- | Replaces all instances of a value in a list by another value.
 replace :: Eq a =>
            a   -- ^ Value to look for
         -> a   -- ^ Value to replace it with
