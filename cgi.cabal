@@ -1,5 +1,5 @@
 Name: cgi
-Version: 2006.10.28
+Version: 2007.1.8
 Copyright: Bjorn Bringert, Andy Gill, Ian Lynagh, Erik Meijer, 
            Sven Panne, Jeremy Shaw
 Maintainer: bjorn@bringert.net
@@ -8,7 +8,7 @@ Homepage: http://www.cs.chalmers.se/~bringert/darcs/haskell-cgi/doc/
 License: BSD3
 License-file: LICENSE
 Build-depends: base, network, parsec, mtl, xhtml
-Extensions: OverlappingInstances, UndecidableInstances
+Extensions: MultiParamTypeClasses
 Synopsis: A Haskell library for writing CGI programs
 Description:
  This is a Haskell library for writing CGI programs. 
