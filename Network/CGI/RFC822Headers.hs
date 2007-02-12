@@ -121,7 +121,7 @@ data ContentType =
                      -- | Media type parameters. On common example is
                      --   the charset parameter for the \"text\" 
                      --   top-level type, e.g. @(\"charset\",\"ISO-8859-1\")@.
-                     ctParamaters :: [(String, String)]
+                     ctParameters :: [(String, String)]
                     }
     deriving (Show, Read, Eq, Ord)
 
