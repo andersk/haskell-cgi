@@ -1,5 +1,5 @@
 Name: cgi
-Version: 3000.0.0
+Version: 3001.0.0
 Copyright: Bjorn Bringert, Andy Gill, Ian Lynagh, Erik Meijer, 
            Sven Panne, Jeremy Shaw
 Maintainer: bjorn@bringert.net
@@ -15,7 +15,6 @@ Exposed-Modules:
    Network.CGI,
    Network.CGI.Monad,
    Network.CGI.Protocol,
-   Network.CGI.Compat,
    Network.CGI.Cookie
 Other-modules:
    Network.CGI.Multipart,
