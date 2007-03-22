@@ -108,8 +108,8 @@ instance Ord HeaderName where
 -- | Runs a CGI action in a given environment. Uses Handles for input and output. 
 hRunCGI :: MonadIO m =>
            [(String,String)] -- ^ CGI environment variables, e.g. from 'getCGIVars'.
-        -> Handle -- ^ Handle that input will be read from, e.g. 'stdin'.
-        -> Handle -- ^ Handle that output will be written to, e.g. 'stdout'.
+        -> Handle -- ^ Handle that input will be read from, e.g. 'System.IO.stdin'.
+        -> Handle -- ^ Handle that output will be written to, e.g. 'System.IO.stdout'.
         -> (CGIRequest -> m (Headers, CGIResult)) -- ^ CGI action
         -> m ()
 hRunCGI env hin hout f = 
