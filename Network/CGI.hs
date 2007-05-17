@@ -367,8 +367,15 @@ progURI =
        let scheme = if port == 443 then "https:" else "http:"
            auth = URIAuth { uriUserInfo = "",
                             uriRegName = host,
-                            uriPort = if port == 80 || port == 443 
-                                       then "" else ":"++show port }
+                            -- FIXME
+                            -- SERVER_HOST seems to include the port
+                            -- if given by the user, so we don't add it.
+                            -- If there is no port in host, we should
+                            -- add it if it's non-standard. Also,
+                            -- we should move the port from uriRegName to
+                            -- uriPort.
+                            uriPort = "" {- if port == 80 || port == 443 
+                                       then "" else ":"++show port -} }
        return $ nullURI { uriScheme = scheme, 
                           uriAuthority = Just auth,
                           uriPath = name }
