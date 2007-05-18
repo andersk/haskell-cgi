@@ -140,8 +140,11 @@ runCGIEnvFPS vars inp f
 
 formatResponse :: ByteString -> Headers -> ByteString
 formatResponse c hs = 
-    BS.unlines ([BS.pack (n++": "++v) | (HeaderName n,v) <- hs] 
+    -- NOTE: we use CRLF since lighttpd mod_fastcgi can't handle
+    -- just LF if there are CRs in the content.
+    unlinesCrLf ([BS.pack (n++": "++v) | (HeaderName n,v) <- hs] 
                 ++ [BS.empty,c])
+  where unlinesCrLf = BS.concat . intersperse (BS.pack "\r\n")
 
 defaultContentType :: String
 defaultContentType = "text/html; charset=ISO-8859-1"
