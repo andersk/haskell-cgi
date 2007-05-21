@@ -186,7 +186,7 @@ findCRLF :: ByteString -- ^ String to split.
 findCRLF s = 
     case findCRorLF s of
               Nothing -> Nothing
-              Just j | j == BS.length s - 1 -> Just (j,1)
+              Just j | BS.null (BS.drop (j+1) s) -> Just (j,1)
               Just j -> case (BS.index s j, BS.index s (j+1)) of
                            ('\n','\r') -> Just (j,2)
                            ('\r','\n') -> Just (j,2)
@@ -203,7 +203,8 @@ startsWithCRLF s = not (BS.null s) && (c == '\n' || c == '\r')
 --   nothing is done. If the string does not start with CRLF,
 --   the first character is dropped.
 dropCRLF :: ByteString -> ByteString
-dropCRLF s | BS.length s <= 1 = BS.drop 1 s
+dropCRLF s | BS.null s = BS.empty
+           | BS.null (BS.drop 1 s) = BS.empty
            | c0 == '\n' && c1 == '\r' = BS.drop 2 s
            | c0 == '\r' && c1 == '\n' = BS.drop 2 s
            | otherwise = BS.drop 1 s
