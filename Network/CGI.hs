@@ -361,22 +361,28 @@ requestHeader name = getVar var
 --   See also 'requestURI'.
 progURI :: MonadCGI m => m URI
 progURI =
-    do host <- serverName
-       port <- serverPort
+    do -- Use HTTP_HOST if available, otherwise SERVER_NAME
+       h <- requestHeader "Host" >>= maybe serverName return
+       p <- serverPort
        name <- scriptName
-       let scheme = if port == 443 then "https:" else "http:"
-           auth = URIAuth { uriUserInfo = "",
+       https <- liftM (maybe False (const True)) (getVar "HTTPS")
+       -- SERVER_PORT might not be the port that the client used
+       -- if the server listens on multiple ports, so we give priority
+       -- to the port in HTTP_HOST.
+       -- HTTP_HOST should include the port according to RFC2616 sec 14.23
+       -- Some servers (e.g. lighttpd) also seem to include the port in 
+       -- SERVER_NAME. 
+       -- We include the port if it is in HTTP_HOST or SERVER_NAME, or if
+       -- it is a non-standard port.
+       let (host,port) = case break (==':') h of
+                           (_,"")  -> (h, if (not https && p == 80) 
+                                            || (https && p == 443) 
+                                           then "" else ':':show p)
+                           (h',p') -> (h',p')
+       let auth = URIAuth { uriUserInfo = "", 
                             uriRegName = host,
-                            -- FIXME
-                            -- SERVER_HOST seems to include the port
-                            -- if given by the user, so we don't add it.
-                            -- If there is no port in host, we should
-                            -- add it if it's non-standard. Also,
-                            -- we should move the port from uriRegName to
-                            -- uriPort.
-                            uriPort = "" {- if port == 80 || port == 443 
-                                       then "" else ":"++show port -} }
-       return $ nullURI { uriScheme = scheme, 
+                            uriPort = port }
+       return $ nullURI { uriScheme = if https then "https:" else "http:", 
                           uriAuthority = Just auth,
                           uriPath = name }
 
