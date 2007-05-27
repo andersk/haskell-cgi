@@ -92,7 +92,8 @@ import Data.Char (toUpper)
 import Data.List (intersperse, sort, group)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
-import Network.URI (URI(..), URIAuth(..), nullURI, parseRelativeReference)
+import Network.URI (URI(..), URIAuth(..), nullURI, parseRelativeReference, 
+                    escapeURIString, isUnescapedInURI)
 import System.IO (stdin, stdout)
 import System.IO.Error (isUserError, ioeGetErrorString)
 
@@ -284,22 +285,36 @@ requestMethod = getVarWithDefault "REQUEST_METHOD" "GET"
 --   CGI program path.
 --   If the string returned by this function is not empty,
 --   it is guaranteed to start with a @\'\/\'@.
+--
+-- Note that this function returns an unencoded string.
+-- Make sure to percent-encode any characters
+-- that are not allowed in URI paths before using the result of
+-- this function to construct a URI.
+-- See 'progURI', 'queryURI' and 'requestURI' for a higher-level
+-- interface.
 pathInfo :: MonadCGI m => m String
 pathInfo = liftM slash $ getVarWithDefault "PATH_INFO" ""
   where slash s = if not (null s) && head s /= '/' then '/':s else s
 
--- | The path returned by 'pathInfo', but with any virtual-to-physical
+-- | The path returned by 'pathInfo', but with virtual-to-physical
 --   mapping applied to it.
 pathTranslated :: MonadCGI m => m String
 pathTranslated = getVarWithDefault "PATH_TRANSLATED" ""
 
--- | A virtual path to the script being executed, 
---   used for self-referencing URLs.
+-- | A virtual path to the script being executed,  
+-- used for self-referencing URIs. 
+--
+-- Note that this function returns an unencoded string.
+-- Make sure to percent-encode any characters
+-- that are not allowed in URI paths before using the result of
+-- this function to construct a URI.
+-- See 'progURI', 'queryURI' and 'requestURI' for a higher-level
+-- interface.
 scriptName :: MonadCGI m => m String
 scriptName = getVarWithDefault "SCRIPT_NAME" ""
 
 -- | The information which follows the ? in the URL which referenced 
---   this program. This is the encoded query information.
+--   this program. This is the percent-encoded query information.
 --   For most normal uses, 'getInput' and friends are probably
 --   more convenient.
 queryString :: MonadCGI m => m String
@@ -359,6 +374,9 @@ requestHeader name = getVar var
 --   If the server is rewriting request URIs, this URI can
 --   be different from the one requested by the client.
 --   See also 'requestURI'.
+--
+-- Characters in the components of the returned URI are escaped 
+-- when needed, as required by "Network.URI".
 progURI :: MonadCGI m => m URI
 progURI =
     do -- Use HTTP_HOST if available, otherwise SERVER_NAME
@@ -384,29 +402,42 @@ progURI =
                             uriPort = port }
        return $ nullURI { uriScheme = if https then "https:" else "http:", 
                           uriAuthority = Just auth,
-                          uriPath = name }
+                          uriPath = escapePath name }
 
 -- | Like 'progURI', but the returned 'URI' also includes
 --   any extra path information, and any query parameters.
 --   If the server is rewriting request URIs, this URI can
 --   be different from the one requested by the client.
 --   See also 'requestURI'.
+--
+-- Characters in the components of the returned URI are escaped 
+-- when needed, as required by "Network.URI".
 queryURI :: MonadCGI m => m URI
 queryURI = 
     do uri  <- progURI
        path <- pathInfo
        qs   <- liftM (\q -> if null q then q else '?':q) $ queryString
-       return $ uri { uriPath = uriPath uri ++ path, uriQuery = qs } 
+       return $ uri { uriPath = uriPath uri ++ escapePath path, 
+                      uriQuery = qs } 
+
+-- | Does percent-encoding as needed for URI path components.
+escapePath :: String -> String
+escapePath = escapeURIString isUnescapedInURIPath
+  where isUnescapedInURIPath c = isUnescapedInURI c && c `notElem` "?#"
 
 -- | Attempts to reconstruct the absolute URI requested by the client,
 --   including extra path information and query parameters.
 --   If no request URI rewriting is done, or if the web server does not
 --   provide the information needed to reconstruct the request URI,
 --   this function returns the same value as 'queryURI'.
+--
+-- Characters in the components of the returned URI are escaped 
+-- when needed, as required by "Network.URI".
 requestURI :: MonadCGI m => m URI
 requestURI =
     do uri <- queryURI
-       -- Apache sets REQUEST_URI to the original request URI
+       -- Apache sets REQUEST_URI to the original request URI,
+       -- with percent-encoding intact.
        mreq <- liftM (>>= parseRelativeReference) $ getVar "REQUEST_URI"
        return $ case mreq of
                  Nothing  -> uri
