@@ -1,5 +1,5 @@
 PROGS = upload.cgi printinput.cgi redirect.cgi hello.cgi \
-        cookie.cgi error.cgi
+        cookie.cgi error.cgi showAllInputs.cgi
 
 GHCFLAGS = -package cgi -fwarn-unused-imports -fallow-overlapping-instances
 
