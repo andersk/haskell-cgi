@@ -1,4 +1,4 @@
-import Network.CGI
+import Network.CGI (CGI, CGIResult, runCGI, liftIO, output, handleErrors)
 
 cgiMain :: CGI CGIResult
 cgiMain = do liftIO $ readFile "foo"

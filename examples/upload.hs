@@ -5,9 +5,12 @@
 import Control.Monad (liftM)
 import Data.Maybe (fromJust)
 
-import qualified Data.ByteString.Lazy as BS
-import Network.CGI
+import qualified Data.ByteString.Lazy as BS (writeFile)
+import Network.CGI (runCGI, getInputFPS, getInputFilename, output, liftIO)
 import Text.XHtml
+   ( paragraph, (!), href, (+++), form, method, enctype, afile, submit
+   , renderHtml, header, thetitle, body, (<<), anchor
+   )
 
 dir = "../upload"
 

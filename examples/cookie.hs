@@ -1,5 +1,9 @@
 import Network.CGI
+   ( CGI, CGIResult, runCGI, output, setCookie, newCookie, getCookie
+   )
 import Text.XHtml
+   ( Html, h1, p, header, body, (+++), thetitle, (<<), renderHtml
+   )
 
 setCounterCookie :: Int -> CGI ()
 setCounterCookie n = setCookie (newCookie "mycookie" (show n))

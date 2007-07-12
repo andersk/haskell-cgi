@@ -1,10 +1,15 @@
 -- Prints the values of all CGI variables and inputs.
 
 import Network.CGI
+   ( CGI, CGIResult, runCGI, output, setHeader, getMultiInput
+   , serverName, serverPort, getInputFilename, requestMethod, pathInfo
+   , pathTranslated, scriptName, remoteHost, remoteAddr, remoteUser
+   , queryString, authType, requestContentType, requestContentLength
+   , requestHeader, progURI, queryURI, requestURI, getVars, getInputNames
+   )
 
 import Control.Monad (liftM)
 import Data.List (intersperse)
-
 
 
 prInput :: String -> CGI String
