@@ -1,4 +1,4 @@
-import Network.CGI (runCGI, getInputs, ouput)
+import Network.CGI (runCGI, getInputs, output)
 
 main =
    runCGI $
