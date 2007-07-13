@@ -55,30 +55,23 @@ data BodyPart = BodyPart [Header] ByteString
 
 -- | Read a multi-part message from a 'ByteString'.
 parseMultipartBody :: String -- ^ Boundary
-                   -> ByteString -> Maybe MultiPart
-parseMultipartBody b s = 
-    do
-    ps <- splitParts (BS.pack b) s
-    liftM MultiPart $ mapM parseBodyPart ps
+                   -> ByteString -> MultiPart
+parseMultipartBody b = 
+    MultiPart . mapMaybe parseBodyPart . splitParts (BS.pack b)
 
 -- | Read a multi-part message from a 'Handle'.
 --   Fails on parse errors.
 hGetMultipartBody :: String -- ^ Boundary
                   -> Handle
                   -> IO MultiPart
-hGetMultipartBody b h = 
-    do
-    s <- BS.hGetContents h
-    case parseMultipartBody b s of
-        Nothing -> fail "Error parsing multi-part message"
-        Just m  -> return m
+hGetMultipartBody b = liftM (parseMultipartBody b) . BS.hGetContents
 
 
 
 parseBodyPart :: ByteString -> Maybe BodyPart
 parseBodyPart s =
     do
-    (hdr,bdy) <- splitAtEmptyLine s
+    let (hdr,bdy) = splitAtEmptyLine s
     hs <- parseM pHeaders "<input>" (BS.unpack hdr)
     return $ BodyPart hs bdy
 
@@ -100,22 +93,22 @@ showBodyPart (BodyPart hs c) =
 -- | Split a multipart message into the multipart parts.
 splitParts :: ByteString -- ^ The boundary, without the initial dashes
            -> ByteString 
-           -> Maybe [ByteString]
-splitParts b s = dropPreamble b s >>= spl
+           -> [ByteString]
+splitParts b = spl . dropPreamble b
   where
   spl x = case splitAtBoundary b x of
-            Nothing -> Nothing
-            Just (s1,d,s2) | isClose b d -> Just [s1]
-                           | otherwise -> spl s2 >>= Just . (s1:)
+            Nothing -> []
+            Just (s1,d,s2) | isClose b d -> [s1]
+                           | otherwise -> s1:spl s2
 
 -- | Drop everything up to and including the first line starting 
---   with the boundary. Returns 'Nothing' if there is no 
---   line starting with a boundary.
+--   with the boundary.
 dropPreamble :: ByteString -- ^ The boundary, without the initial dashes
              -> ByteString 
-             -> Maybe ByteString
-dropPreamble b s | isBoundary b s = fmap snd (splitAtCRLF s)
-                 | otherwise = dropLine s >>= dropPreamble b
+             -> ByteString
+dropPreamble b s | BS.null s = BS.empty
+                 | isBoundary b s = dropLine s
+                 | otherwise = dropPreamble b (dropLine s)
 
 -- | Split a string at the first boundary line.
 splitAtBoundary :: ByteString -- ^ The boundary, without the initial dashes
@@ -135,7 +128,7 @@ splitAtBoundary b s = spl 0
                   where 
                   s1 = BS.take (i+j) s
                   s2 = BS.drop (i+j+l) s
-                  (d,s3) = splitAtCRLF_ s2
+                  (d,s3) = splitAtCRLF s2
 
 -- | Check whether a string starts with two dashes followed by
 --   the given boundary string.
@@ -167,37 +160,34 @@ unlinesCRLF :: [ByteString] -> ByteString
 unlinesCRLF = BS.concat . intersperse crlf
 
 -- | Drop everything up to and including the first CRLF.
-dropLine :: ByteString -> Maybe ByteString
-dropLine s = fmap snd (splitAtCRLF s)
+dropLine :: ByteString -> ByteString
+dropLine s = snd (splitAtCRLF s)
 
 -- | Split a string at the first empty line. The CRLF (if any) before the
 --   empty line is included in the first result. The CRLF after the
 --   empty line is not included in the result.
---   'Nothing' is returned if there is no empty line.
-splitAtEmptyLine :: ByteString -> Maybe (ByteString, ByteString)
-splitAtEmptyLine s | startsWithCRLF s = Just (BS.empty, dropCRLF s)
+--   If there is no empty line, the entire input is returned
+--   as the first result.
+splitAtEmptyLine :: ByteString -> (ByteString, ByteString)
+splitAtEmptyLine s | startsWithCRLF s = (BS.empty, dropCRLF s)
                    | otherwise = spl 0
   where
   spl i = case findCRLF (BS.drop i s) of
-              Nothing -> Nothing
-              Just (j,l) | startsWithCRLF s2 -> Just (s1, dropCRLF s2)
+              Nothing -> (s, BS.empty)
+              Just (j,l) | startsWithCRLF s2 -> (s1, dropCRLF s2)
                          | otherwise -> spl (i+j+l)
                 where (s1,s2) = BS.splitAt (i+j+l) s
 
 -- | Split a string at the first CRLF. The CRLF is not included
 --   in any of the returned strings.
+--   If there is no CRLF, the entire input is returned
+--   as the first string.
 splitAtCRLF :: ByteString -- ^ String to split.
-            -> Maybe (ByteString,ByteString)
-            -- ^  Returns 'Nothing' if there is no CRLF.
+            -> (ByteString,ByteString)
 splitAtCRLF s = case findCRLF s of
-                  Nothing -> Nothing
-                  Just (i,l) -> Just (s1, BS.drop l s2)
+                  Nothing -> (s,BS.empty)
+                  Just (i,l) -> (s1, BS.drop l s2)
                       where (s1,s2) = BS.splitAt i s
-
--- | Like 'splitAtCRLF', but if no CRLF is found, the first
---   result is the argument string, and the second result is empty.
-splitAtCRLF_ :: ByteString -> (ByteString,ByteString)
-splitAtCRLF_ s = fromMaybe (s,BS.empty) (splitAtCRLF s)
 
 -- | Get the index and length of the first CRLF, if any.
 findCRLF :: ByteString -- ^ String to split.

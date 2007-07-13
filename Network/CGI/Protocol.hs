@@ -280,9 +280,8 @@ multipartDecode :: [(String,String)] -- ^ Content-type parameters
                 -> [(String,Input)]  -- ^ Input variables and values.
 multipartDecode ps inp =
     case lookup "boundary" ps of
-         Just b -> case parseMultipartBody b inp of
-                        Just (MultiPart bs) -> map bodyPartToInput bs
-                        Nothing -> [] -- FIXME: report parse error
+         Just b -> let MultiPart bs = parseMultipartBody b inp
+                    in map bodyPartToInput bs
          Nothing -> [] -- FIXME: report that there was no boundary
 
 bodyPartToInput :: BodyPart -> (String,Input)
