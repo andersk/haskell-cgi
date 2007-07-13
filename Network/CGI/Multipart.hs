@@ -20,6 +20,7 @@ module Network.CGI.Multipart
      -- * Multi-part messages
      MultiPart(..), BodyPart(..), Header
     , parseMultipartBody, hGetMultipartBody
+    , showMultipartBody
      -- * Headers
     , ContentType(..), ContentTransferEncoding(..)
     , ContentDisposition(..)
@@ -33,6 +34,7 @@ module Network.CGI.Multipart
 
 import Control.Monad
 import Data.Int (Int64)
+import Data.List (intersperse)
 import Data.Maybe
 import System.IO (Handle)
 
@@ -79,6 +81,17 @@ parseBodyPart s =
     (hdr,bdy) <- splitAtEmptyLine s
     hs <- parseM pHeaders "<input>" (BS.unpack hdr)
     return $ BodyPart hs bdy
+
+showMultipartBody :: String -> MultiPart -> ByteString
+showMultipartBody b (MultiPart bs) = 
+    unlinesCRLF $ foldr (\x xs -> d:showBodyPart x:xs) [c,BS.empty] bs
+ where d = BS.pack ("--" ++ b)
+       c = BS.pack ("--" ++ b ++ "--")       
+
+showBodyPart :: BodyPart -> ByteString
+showBodyPart (BodyPart hs c) = 
+    unlinesCRLF $ [BS.pack (n++": "++v) | (n,v) <- hs] ++ [BS.empty,c]
+
 
 --
 -- * Splitting into multipart parts.
@@ -146,6 +159,12 @@ startsWithDashes s = BS.pack "--" `BS.isPrefixOf` s
 --
 -- * RFC 2046 CRLF
 --
+
+crlf :: ByteString
+crlf = BS.pack "\r\n"
+
+unlinesCRLF :: [ByteString] -> ByteString
+unlinesCRLF = BS.concat . intersperse crlf
 
 -- | Drop everything up to and including the first CRLF.
 dropLine :: ByteString -> Maybe ByteString
