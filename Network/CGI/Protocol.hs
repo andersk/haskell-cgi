@@ -63,10 +63,11 @@ data CGIRequest =
                 -- | Input parameters. For better laziness in reading inputs,
                 --   this is not a Map.
                 cgiInputs :: [(String, Input)],
-                -- | Raw request body. To avoid memory leaks, 
-                -- this is the empty string if the request body has been interpreted
-                -- as inputs in "application/x-www-form-urlencoded" or
-                -- "multipart/form-data" format.
+                -- | Raw request body. To avoid memory leaks,
+                -- this is the empty string if the request body has been
+                -- interpreted as inputs in
+                -- "application\/x-www-form-urlencoded" or
+                -- "multipart\/form-data" format.
                 cgiRequestBody :: ByteString
                }
     deriving (Show)
