@@ -37,6 +37,7 @@ module Network.CGI.RFC822Headers (
                               ContentDisposition(..),
                               getContentDisposition,                           
                               parseContentDisposition,
+                              showContentDisposition,
                               
                               -- * Utilities
                               parseM) where
@@ -191,6 +192,11 @@ parseContentDisposition = parseM pContentDisposition "Content-disposition"
 getContentDisposition :: Monad m => [Header] -> m ContentDisposition
 getContentDisposition hs = 
     lookupM "content-disposition" hs  >>= parseContentDisposition
+
+showContentDisposition :: ContentDisposition -> String
+showContentDisposition (ContentDisposition t hs) = 
+    t ++ concat ["; " ++ n ++ "=" ++ quote v | (n,v) <- hs]
+  where quote x = "\"" ++ x ++ "\"" -- NOTE: silly, but de-facto standard
 
 --
 -- * Utilities
