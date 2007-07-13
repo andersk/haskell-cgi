@@ -63,7 +63,10 @@ data CGIRequest =
                 -- | Input parameters. For better laziness in reading inputs,
                 --   this is not a Map.
                 cgiInputs :: [(String, Input)],
-                -- | Raw request body. 
+                -- | Raw request body. To avoid memory leaks, 
+                -- this is the empty string if the request body has been interpreted
+                -- as inputs in "application/x-www-form-urlencoded" or
+                -- "multipart/form-data" format.
                 cgiRequestBody :: ByteString
                }
     deriving (Show)
@@ -126,10 +129,11 @@ runCGIEnvFPS :: Monad m =>
           -> (CGIRequest -> m (Headers, CGIResult)) -- ^ CGI action.
           -> m ByteString -- ^ Response (headers and content).
 runCGIEnvFPS vars inp f
-    = do (hs,outp) <- f $ CGIRequest {
+    = do let (inputs,body) = decodeInput vars inp
+         (hs,outp) <- f $ CGIRequest {
                                       cgiVars = Map.fromList vars,
-                                      cgiInputs = decodeInput vars inp,
-                                      cgiRequestBody = inp
+                                      cgiInputs = inputs,
+                                      cgiRequestBody = body
                                      }
          return $ case outp of
            CGIOutput c -> formatResponse c hs'
@@ -159,8 +163,11 @@ defaultContentType = "text/html; charset=ISO-8859-1"
 --   method and the content-type.
 decodeInput :: [(String,String)] -- ^ CGI environment variables.
             -> ByteString        -- ^ Request body.
-            -> [(String,Input)]  -- ^ Input variables and values.
-decodeInput env inp = queryInput env ++ bodyInput env inp
+            -> ([(String,Input)],ByteString)  
+               -- ^ A list of input variables and values, and the request body
+               -- if it was not interpreted.
+decodeInput env inp =
+  let (inputs, body) = bodyInput env inp in (queryInput env ++ inputs, body)
 
 -- | Builds an 'Input' object for a simple value.
 simpleInput :: String -> Input
@@ -237,30 +244,30 @@ urlDecode = unEscapeString . replace '+' ' '
 --
 
 -- | Gets input variables from the body, if any.
-bodyInput :: [(String,String)] -- ^ CGI environment variables.
-          -> ByteString        -- ^ Request body.
-          -> [(String,Input)]  -- ^ Input variables and values.
+bodyInput :: [(String,String)]
+          -> ByteString
+          -> ([(String,Input)], ByteString)
 bodyInput env inp =
    case lookup "REQUEST_METHOD" env of
       Just "POST" -> 
           let ctype = lookup "CONTENT_TYPE" env >>= parseContentType
            in decodeBody ctype $ takeInput env inp
-      _ -> []
+      _ -> ([], inp)
 
 -- | Decodes a POST body.
-decodeBody :: Maybe ContentType -- ^ Content-type, if any
-           -> ByteString        -- ^ Request body
-           -> [(String,Input)]  -- ^ Input variables and values.
+decodeBody :: Maybe ContentType
+           -> ByteString
+           -> ([(String,Input)], ByteString)
 decodeBody ctype inp = 
     case ctype of
                Just (ContentType "application" "x-www-form-urlencoded" _) 
-                   -> formInput (BS.unpack inp)
+                   -> (formInput (BS.unpack inp), BS.empty)
                Just (ContentType "multipart" "form-data" ps) 
-                   -> multipartDecode ps inp
-               Just _ -> [] -- unknown content-type, the user will have to
+                   -> (multipartDecode ps inp, BS.empty)
+               Just _ -> ([], inp) -- unknown content-type, the user will have to
                             -- deal with it by looking at the raw content
                -- No content-type given, assume x-www-form-urlencoded
-               Nothing -> formInput (BS.unpack inp)
+               Nothing -> (formInput (BS.unpack inp), BS.empty)
 
 -- | Takes the right number of bytes from the input.
 takeInput :: [(String,String)]  -- ^ CGI environment variables.
