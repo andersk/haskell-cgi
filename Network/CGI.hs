@@ -479,8 +479,7 @@ getMultiInput :: MonadCGI m =>
                  String -- ^ The name of the variable.
               -> m [String] -- ^ The values of the variable,
                             -- or the empty list if the variable was not set.
-getMultiInput n = do is <- cgiGet cgiInputs
-                     return [BS.unpack (inputValue v) | (p,v) <- is, p == n]
+getMultiInput = liftM (map BS.unpack) . getMultiInputFPS
 
 -- | Same as 'getMultiInput' but using 'ByteString's.
 getMultiInputFPS :: MonadCGI m => 
