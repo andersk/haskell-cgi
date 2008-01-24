@@ -83,6 +83,8 @@ module Network.CGI (
   , setCookie, deleteCookie
   -- * URL encoding
   , formEncode, urlEncode, formDecode, urlDecode
+  -- * Compatibility with the old API
+  , module Network.CGI.Compat
   ) where
 
 import Control.Exception (Exception(..))
@@ -106,6 +108,7 @@ import Network.CGI.RFC822Headers (ContentType(..),
                                   parseContentType, showContentType)
 import Network.CGI.Monad
 import Network.CGI.Protocol
+import Network.CGI.Compat
 
 import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++), 
                    body, h1, paragraph, hr, address)
