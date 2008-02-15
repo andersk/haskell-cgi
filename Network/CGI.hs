@@ -59,7 +59,7 @@ module Network.CGI (
   , outputError, outputException 
   , outputNotFound, outputMethodNotAllowed, outputInternalServerError
   -- * Input
-  , getInput, getInputFPS, readInput
+  , getInput, getInputFPS, readInput, getBody
   , getInputs, getInputNames
   , getMultiInput, getMultiInputFPS
   , getInputFilename, getInputContentType
@@ -533,6 +533,10 @@ getInputNames = (sortNub . map fst) `liftM` cgiGet cgiInputs
 
 getInput_ ::  MonadCGI m => String -> m (Maybe Input)
 getInput_ n = lookup n `liftM` cgiGet cgiInputs
+
+-- | Get the uninterpreted request body
+getBody :: MonadCGI m => m ByteString
+getBody = cgiGet cgiRequestBody
 
 
 --
