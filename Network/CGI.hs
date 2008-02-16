@@ -59,7 +59,8 @@ module Network.CGI (
   , outputError, outputException 
   , outputNotFound, outputMethodNotAllowed, outputInternalServerError
   -- * Input
-  , getInput, getInputFPS, readInput, getBody
+  , getInput, getInputFPS, readInput
+  , getBody, getBodyFPS
   , getInputs, getInputNames
   , getMultiInput, getMultiInputFPS
   , getInputFilename, getInputContentType
@@ -534,10 +535,13 @@ getInputNames = (sortNub . map fst) `liftM` cgiGet cgiInputs
 getInput_ ::  MonadCGI m => String -> m (Maybe Input)
 getInput_ n = lookup n `liftM` cgiGet cgiInputs
 
--- | Get the uninterpreted request body
-getBody :: MonadCGI m => m ByteString
-getBody = cgiGet cgiRequestBody
+-- | Get the uninterpreted request body as a String
+getBody :: MonadCGI m => m String
+getBody = BS.unpack `liftM` cgiGet cgiRequestBody
 
+-- | Get the uninterpreted request body as lazy ByteString
+getBodyFPS :: MonadCGI m => m ByteString
+getBodyFPS = cgiGet cgiRequestBody
 
 --
 -- * Cookies
