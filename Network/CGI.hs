@@ -61,7 +61,7 @@ module Network.CGI (
   -- * Input
   , getInput, getInputFPS, readInput
   , getBody, getBodyFPS
-  , getInputs, getInputNames
+  , getInputs, getInputsFPS, getInputNames
   , getMultiInput, getMultiInputFPS
   , getInputFilename, getInputContentType
   -- * Environment
@@ -524,6 +524,13 @@ readInput = liftM (>>= maybeRead) . getInput
 getInputs :: MonadCGI m => m [(String,String)]
 getInputs = do is <- cgiGet cgiInputs
                return [ (n, BS.unpack (inputValue i)) | (n,i) <- is ]
+
+-- | Get the names and values of all inputs.
+--   Note: the same name may occur more than once in the output,
+--   if there are several values for the name.
+getInputsFPS :: MonadCGI m => m [(String,ByteString)]
+getInputsFPS = do is <- cgiGet cgiInputs
+                  return [ (n, inputValue i) | (n,i) <- is ]
 
 -- | Get the names of all input variables.
 getInputNames :: MonadCGI m => m [String]
