@@ -45,6 +45,7 @@ module Network.CGI.Header (
 
 import Data.Char
 import Data.List
+import Data.Monoid
 import Text.ParserCombinators.Parsec
 
 type Header = (String, String)
@@ -125,7 +126,19 @@ data ContentType =
                      --   top-level type, e.g. @(\"charset\",\"ISO-8859-1\")@.
                      ctParameters :: [(String, String)]
                     }
-    deriving (Show, Read, Eq, Ord)
+    deriving (Show, Read)
+
+instance Eq ContentType where
+    x == y = ctType x `caseInsensitiveEq` ctType y 
+             && ctSubtype x `caseInsensitiveEq` ctSubtype y 
+             -- FIXME: case-insensitive comparison of parameter names
+             && ctParameters x == ctParameters y
+
+instance Ord ContentType where
+    x `compare` y = mconcat [ctType x `caseInsensitiveCompare` ctType y,
+                             ctSubtype x `caseInsensitiveCompare` ctSubtype y,
+                             -- FIXME: case-insensitive comparison of parameter names
+                             ctParameters x `compare` ctParameters y]
 
 -- | Produce the standard string representation of a content-type,
 --   e.g. \"text\/html; charset=ISO-8859-1\".
@@ -211,6 +224,12 @@ parseM p n inp =
 
 lookupM :: (Monad m, Eq a, Show a) => a -> [(a,b)] -> m b
 lookupM n = maybe (fail ("No such field: " ++ show n)) return . lookup n
+
+caseInsensitiveEq :: String -> String -> Bool
+caseInsensitiveEq x y = map toLower x == map toLower y
+
+caseInsensitiveCompare :: String -> String -> Ordering
+caseInsensitiveCompare x y = map toLower x `compare` map toLower y
 
 -- 
 -- * Parsing utilities
