@@ -2,7 +2,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Network.CGI.RFC822Headers
+-- Module      :  Network.CGI.Header
 -- Copyright   :  (c) Peter Thiemann 2001,2002
 --                (c) Bjorn Bringert 2005-2006
 -- License     :  BSD-style
@@ -11,11 +11,11 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Parsing of RFC822-style headers (name, value pairs)
+-- Parsing of HTTP headers (name, value pairs)
 -- Partly based on code from WASHMail.
 --
 -----------------------------------------------------------------------------
-module Network.CGI.RFC822Headers (
+module Network.CGI.Header (
                               -- * Headers
                               Header, 
                               pHeader,
@@ -26,6 +26,7 @@ module Network.CGI.RFC822Headers (
                               ContentType(..), 
                               getContentType,
                               parseContentType,
+                              pContentType,
                               showContentType,
 
                               -- * Content-transfer-encoding

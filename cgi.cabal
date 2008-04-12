@@ -24,7 +24,7 @@ Library
     Network.CGI.Compat
   Other-modules:
     Network.CGI.Multipart,
-    Network.CGI.RFC822Headers
+    Network.CGI.Header
   Extensions: MultiParamTypeClasses
   ghc-options: -Wall
 

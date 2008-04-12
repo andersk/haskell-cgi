@@ -38,7 +38,7 @@ import Data.List (intersperse)
 import Data.Maybe
 import System.IO (Handle)
 
-import Network.CGI.RFC822Headers
+import Network.CGI.Header
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
