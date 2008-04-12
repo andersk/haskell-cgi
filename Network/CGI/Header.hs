@@ -136,7 +136,7 @@ pContentType :: Parser ContentType
 pContentType = 
   do many ws1
      c_type <- p_token
-     lexeme $ char '/'
+     char '/'
      c_subtype <- lexeme $ p_token
      c_parameters <- many p_parameter
      return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
