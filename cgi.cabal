@@ -23,6 +23,7 @@ Library
     Network.CGI.Cookie,
     Network.CGI.Compat
   Other-modules:
+    Network.CGI.Accept,
     Network.CGI.Multipart,
     Network.CGI.Header
   Extensions: MultiParamTypeClasses

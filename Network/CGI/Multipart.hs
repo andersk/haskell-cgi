@@ -18,15 +18,13 @@
 module Network.CGI.Multipart 
     (
      -- * Multi-part messages
-     MultiPart(..), BodyPart(..), Header
+     MultiPart(..), BodyPart(..)
     , parseMultipartBody, hGetMultipartBody
     , showMultipartBody
      -- * Headers
     , ContentType(..), ContentTransferEncoding(..)
     , ContentDisposition(..)
     , parseContentType
-    , parseContentTransferEncoding
-    , parseContentDisposition
     , getContentType
     , getContentTransferEncoding
     , getContentDisposition
@@ -48,10 +46,10 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 --
 
 data MultiPart = MultiPart [BodyPart]
-               deriving (Show, Read, Eq, Ord)
+               deriving (Show, Eq, Ord)
 
-data BodyPart = BodyPart [Header] ByteString
-                deriving (Show, Read, Eq, Ord)
+data BodyPart = BodyPart Headers ByteString
+                deriving (Show, Eq, Ord)
 
 -- | Read a multi-part message from a 'ByteString'.
 parseMultipartBody :: String -- ^ Boundary
@@ -83,7 +81,7 @@ showMultipartBody b (MultiPart bs) =
 
 showBodyPart :: BodyPart -> ByteString
 showBodyPart (BodyPart hs c) = 
-    unlinesCRLF $ [BS.pack (n++": "++v) | (n,v) <- hs] ++ [BS.empty,c]
+    unlinesCRLF $ [BS.pack (n++": "++v) | (HeaderName n,v) <- hs] ++ [BS.empty,c]
 
 
 --

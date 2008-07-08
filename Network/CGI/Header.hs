@@ -17,46 +17,66 @@
 -----------------------------------------------------------------------------
 module Network.CGI.Header (
                               -- * Headers
-                              Header, 
-                              pHeader,
+                              Headers,
+                              HeaderName(..),
+                              HeaderValue(..),
                               pHeaders,
-                              parseHeaders,
 
                               -- * Content-type
                               ContentType(..), 
                               getContentType,
                               parseContentType,
-                              pContentType,
                               showContentType,
 
                               -- * Content-transfer-encoding
                               ContentTransferEncoding(..),
                               getContentTransferEncoding,
-                              parseContentTransferEncoding,
 
                               -- * Content-disposition
                               ContentDisposition(..),
                               getContentDisposition,                           
-                              parseContentDisposition,
-                              showContentDisposition,
                               
                               -- * Utilities
-                              parseM) where
+                              parseM,
+                              caseInsensitiveEq,
+                              caseInsensitiveCompare,
+                              lexeme, ws1, p_token
+                          ) where
 
+import Control.Monad
 import Data.Char
+import Data.Function
 import Data.List
+import Data.Maybe
 import Data.Monoid
+
 import Text.ParserCombinators.Parsec
 
-type Header = (String, String)
+--
+-- * Headers
+--
 
-pHeaders :: Parser [Header]
+-- | HTTP headers.
+type Headers = [(HeaderName, String)]
+
+-- | A string with case insensitive equality and comparisons.
+newtype HeaderName = HeaderName String deriving (Show)
+
+instance Eq HeaderName where
+    HeaderName x == HeaderName y = map toLower x == map toLower y
+
+instance Ord HeaderName where
+    HeaderName x `compare` HeaderName y = map toLower x `compare` map toLower y
+
+
+class HeaderValue a where
+    parseHeaderValue :: Parser a
+    prettyHeaderValue :: a -> String
+
+pHeaders :: Parser Headers
 pHeaders = many pHeader
 
-parseHeaders :: Monad m => SourceName -> String -> m [Header]
-parseHeaders s inp = parseM pHeaders s inp
-
-pHeader :: Parser Header
+pHeader :: Parser (HeaderName, String)
 pHeader = 
     do name <- many1 headerNameChar
        char ':'
@@ -64,7 +84,7 @@ pHeader =
        line <- lineString
        crLf
        extraLines <- many extraFieldLine
-       return (map toLower name, concat (line:extraLines))
+       return (HeaderName name, concat (line:extraLines))
 
 extraFieldLine :: Parser String
 extraFieldLine = 
@@ -72,6 +92,9 @@ extraFieldLine =
        line <- lineString
        crLf
        return (sp:line)
+
+getHeaderValue :: (Monad m, HeaderValue a) => String -> Headers -> m a
+getHeaderValue h hs = lookupM (HeaderName h) hs >>= parseM parseHeaderValue h
 
 --
 -- * Parameters (for Content-type etc.)
@@ -86,9 +109,20 @@ showParameters = concatMap f
                 | otherwise = [c]
 
 p_parameter :: Parser (String,String)
-p_parameter =
+p_parameter = try $
   do lexeme $ char ';'
      p_name <- lexeme $ p_token
+     -- Don't allow parameters named q. This is needed for parsing Accept-X 
+     -- headers. From RFC 2616 14.1:
+     --    Note: Use of the "q" parameter name to separate media type
+     --    parameters from Accept extension parameters is due to historical
+     --    practice. Although this prevents any media type parameter named
+     --    "q" from being used with a media range, such an event is believed
+     --    to be unlikely given the lack of any "q" parameters in the IANA
+     --    media type registry and the rare usage of any media type
+     --    parameters in Accept. Future media types are discouraged from
+     --    registering any parameter named "q".
+     when (p_name == "q") pzero
      lexeme $ char '='
      -- Workaround for seemingly standardized web browser bug
      -- where nothing is escaped in the filename parameter
@@ -98,7 +132,6 @@ p_parameter =
                    else literalString
      p_value <- litStr <|> p_token
      return (map toLower p_name, p_value)
-
 
 -- 
 -- * Content type
@@ -131,37 +164,35 @@ data ContentType =
 instance Eq ContentType where
     x == y = ctType x `caseInsensitiveEq` ctType y 
              && ctSubtype x `caseInsensitiveEq` ctSubtype y 
-             -- FIXME: case-insensitive comparison of parameter names
              && ctParameters x == ctParameters y
 
 instance Ord ContentType where
     x `compare` y = mconcat [ctType x `caseInsensitiveCompare` ctType y,
                              ctSubtype x `caseInsensitiveCompare` ctSubtype y,
-                             -- FIXME: case-insensitive comparison of parameter names
                              ctParameters x `compare` ctParameters y]
 
--- | Produce the standard string representation of a content-type,
---   e.g. \"text\/html; charset=ISO-8859-1\".
-showContentType :: ContentType -> String
-showContentType (ContentType x y ps) = x ++ "/" ++ y ++ showParameters ps
+instance HeaderValue ContentType where
+    parseHeaderValue = 
+        do many ws1
+           c_type <- p_token
+           char '/'
+           c_subtype <- lexeme $ p_token
+           c_parameters <- many p_parameter
+           return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
+    prettyHeaderValue (ContentType x y ps) = x ++ "/" ++ y ++ showParameters ps
 
-pContentType :: Parser ContentType
-pContentType = 
-  do many ws1
-     c_type <- p_token
-     char '/'
-     c_subtype <- lexeme $ p_token
-     c_parameters <- many p_parameter
-     return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
 
 -- | Parse the standard representation of a content-type.
 --   If the input cannot be parsed, this function calls
 --   'fail' with a (hopefully) informative error message.
 parseContentType :: Monad m => String -> m ContentType
-parseContentType = parseM pContentType "Content-type"
+parseContentType = parseM parseHeaderValue "Content-type"
 
-getContentType :: Monad m => [Header] -> m ContentType
-getContentType hs = lookupM "content-type" hs >>= parseContentType
+showContentType :: ContentType -> String
+showContentType = prettyHeaderValue
+
+getContentType :: Monad m => Headers -> m ContentType
+getContentType = getHeaderValue "content-type"
 
 --
 -- * Content transfer encoding
@@ -171,19 +202,15 @@ data ContentTransferEncoding =
 	ContentTransferEncoding String
     deriving (Show, Read, Eq, Ord)
 
-pContentTransferEncoding :: Parser ContentTransferEncoding
-pContentTransferEncoding =
-  do many ws1
-     c_cte <- p_token
-     return $ ContentTransferEncoding (map toLower c_cte)
+instance HeaderValue ContentTransferEncoding where
+    parseHeaderValue = 
+        do many ws1
+           c_cte <- p_token
+           return $ ContentTransferEncoding (map toLower c_cte)
+    prettyHeaderValue (ContentTransferEncoding s) = s
 
-parseContentTransferEncoding :: Monad m => String -> m ContentTransferEncoding
-parseContentTransferEncoding = 
-    parseM pContentTransferEncoding "Content-transfer-encoding"
-
-getContentTransferEncoding :: Monad m => [Header] -> m ContentTransferEncoding
-getContentTransferEncoding hs = 
-    lookupM "content-transfer-encoding" hs >>= parseContentTransferEncoding
+getContentTransferEncoding :: Monad m => Headers -> m ContentTransferEncoding
+getContentTransferEncoding = getHeaderValue "content-transfer-encoding"
 
 --
 -- * Content disposition
@@ -193,24 +220,18 @@ data ContentDisposition =
 	ContentDisposition String [(String, String)]
     deriving (Show, Read, Eq, Ord)
 
-pContentDisposition :: Parser ContentDisposition
-pContentDisposition =
-  do many ws1
-     c_cd <- p_token
-     c_parameters <- many p_parameter
-     return $ ContentDisposition (map toLower c_cd) c_parameters
+instance HeaderValue ContentDisposition where
+    parseHeaderValue = 
+        do many ws1
+           c_cd <- p_token
+           c_parameters <- many p_parameter
+           return $ ContentDisposition (map toLower c_cd) c_parameters
+    prettyHeaderValue (ContentDisposition t hs) = 
+        t ++ concat ["; " ++ n ++ "=" ++ quote v | (n,v) <- hs]
+            where quote x = "\"" ++ x ++ "\"" -- NOTE: silly, but de-facto standard
 
-parseContentDisposition :: Monad m => String -> m ContentDisposition
-parseContentDisposition = parseM pContentDisposition "Content-disposition"
-
-getContentDisposition :: Monad m => [Header] -> m ContentDisposition
-getContentDisposition hs = 
-    lookupM "content-disposition" hs  >>= parseContentDisposition
-
-showContentDisposition :: ContentDisposition -> String
-showContentDisposition (ContentDisposition t hs) = 
-    t ++ concat ["; " ++ n ++ "=" ++ quote v | (n,v) <- hs]
-  where quote x = "\"" ++ x ++ "\"" -- NOTE: silly, but de-facto standard
+getContentDisposition :: Monad m => Headers -> m ContentDisposition
+getContentDisposition = getHeaderValue "content-disposition"
 
 --
 -- * Utilities

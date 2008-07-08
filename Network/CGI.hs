@@ -66,6 +66,7 @@ module Network.CGI (
   , getInputFilename, getInputContentType
   -- * Environment
   , getVar, getVarWithDefault, getVars
+  -- * Request information
   , serverName, serverPort
   , requestMethod, pathInfo
   , pathTranslated, scriptName
@@ -76,6 +77,11 @@ module Network.CGI (
   , requestHeader
   -- * Program and request URI
   , progURI, queryURI, requestURI
+  -- * Content negotiation
+  , Accept
+  , Charset, ContentEncoding, Language
+  , requestAccept, requestAcceptCharset, requestAcceptEncoding, requestAcceptLanguage
+  , negotiate
   -- * Content type
   , ContentType(..), showContentType, parseContentType
   -- * Cookies
@@ -105,8 +111,8 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Network.CGI.Cookie (Cookie(..), showCookie, newCookie, findCookie)
 import qualified Network.CGI.Cookie as Cookie (deleteCookie)
-import Network.CGI.Header (ContentType(..), 
-                                  parseContentType, showContentType)
+import Network.CGI.Accept
+import Network.CGI.Header
 import Network.CGI.Monad
 import Network.CGI.Protocol
 import Network.CGI.Compat
@@ -197,9 +203,17 @@ outputError :: (MonadCGI m, MonadIO m) =>
 outputError c m es = 
       do logCGI $ show (c,m,es)
          setStatus c m
-         setHeader "Content-type" "text/html; charset=ISO-8859-1"
-         page <- errorPage c m es 
-         output $ renderHtml page
+         let textType = ContentType "text" "plain" [("charset","ISO-8859-1")]
+             htmlType = ContentType "text" "html"  [("charset","ISO-8859-1")]
+         cts <- liftM (negotiate [htmlType,textType]) requestAccept
+         case cts of
+           ct:_ | ct == textType -> 
+                do setHeader "Content-type" (showContentType textType)
+                   text <- errorText c m es
+                   output text
+           _ -> do setHeader "Content-type" (showContentType htmlType)
+                   page <- errorPage c m es 
+                   output $ renderHtml page
 
 -- | Create an HTML error page.
 errorPage :: MonadCGI m => 
@@ -218,6 +232,13 @@ errorPage c m es =
        return $ header << thetitle << tit 
                   +++ body << (h1 << tit +++ map (paragraph <<) es 
                                +++ hr +++ address << sig)
+
+errorText :: MonadCGI m => 
+             Int      -- ^ Status code
+          -> String   -- ^ Status message
+          -> [String] -- ^ Error information
+          -> m String
+errorText c m es = return $ unlines $ (show c ++ " " ++ m) : es
 
 --
 -- * Specific HTTP errors
@@ -269,6 +290,9 @@ getVars :: MonadCGI m =>
            m [(String,String)]
 getVars = liftM Map.toList $ cgiGet cgiVars
 
+--
+-- * Request information
+--
 
 -- | The server\'s hostname, DNS alias, or IP address as it would 
 --   appear in self-referencing URLs.
@@ -366,6 +390,24 @@ requestHeader :: MonadCGI m => String -> m (Maybe String)
 requestHeader name = getVar var
   where var = "HTTP_" ++ map toUpper (replace '-' '_' name)
 
+--
+-- * Content negotiation
+--
+
+requestHeaderValue :: (MonadCGI m, HeaderValue a) => String -> m (Maybe a)
+requestHeaderValue h = liftM (>>= parseM parseHeaderValue h) $ requestHeader h
+
+requestAccept :: MonadCGI m => m (Maybe (Accept ContentType))
+requestAccept = requestHeaderValue "Accept"
+
+requestAcceptCharset :: MonadCGI m => m (Maybe (Accept Charset))
+requestAcceptCharset = requestHeaderValue "Accept-Charset"
+
+requestAcceptEncoding :: MonadCGI m => m (Maybe (Accept ContentEncoding))
+requestAcceptEncoding = requestHeaderValue "Accept-Encoding"
+
+requestAcceptLanguage :: MonadCGI m => m (Maybe (Accept Language))
+requestAcceptLanguage = requestHeaderValue "Accept-Language"
 
 --
 -- * Program and request URI

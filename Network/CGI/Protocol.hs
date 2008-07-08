@@ -33,7 +33,6 @@ module Network.CGI.Protocol (
  ) where
 
 import Control.Monad.Trans (MonadIO(..))
-import Data.Char (toLower)
 import Data.List (intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -47,6 +46,7 @@ import Data.ByteString.Lazy.Char8 (ByteString)
 
 import Data.Typeable (Typeable(..), mkTyConApp, mkTyCon)
 
+import Network.CGI.Header
 import Network.CGI.Multipart
 
 
@@ -91,19 +91,6 @@ data Input = Input {
 data CGIResult = CGIOutput ByteString
                | CGINothing
                  deriving (Show, Read, Eq, Ord)
-
-type Headers = [(HeaderName, String)]
-
--- | A string with case insensitive equality and comparisons.
-newtype HeaderName = HeaderName String deriving (Show)
-
-instance Eq HeaderName where
-    HeaderName x == HeaderName y = map toLower x == map toLower y
-
-instance Ord HeaderName where
-    HeaderName x `compare` HeaderName y = map toLower x `compare` map toLower y
-
-
 
 --
 -- * Running CGI actions
