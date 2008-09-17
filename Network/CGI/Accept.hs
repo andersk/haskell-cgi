@@ -1,7 +1,8 @@
 module Network.CGI.Accept (
   -- * Accept-X headers
-    Accept
-  , Charset, ContentEncoding, Language
+    Acceptable
+  , Accept
+  , Charset(..), ContentEncoding(..), Language(..)
   -- * Content negotiation
   , negotiate
                           ) where

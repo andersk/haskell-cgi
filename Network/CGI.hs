@@ -78,8 +78,8 @@ module Network.CGI (
   -- * Program and request URI
   , progURI, queryURI, requestURI
   -- * Content negotiation
-  , Accept
-  , Charset, ContentEncoding, Language
+  , Acceptable, Accept
+  , Charset(..), ContentEncoding(..), Language(..)
   , requestAccept, requestAcceptCharset, requestAcceptEncoding, requestAcceptLanguage
   , negotiate
   -- * Content type
