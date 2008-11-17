@@ -293,9 +293,9 @@ buggyLiteralString =
 headerNameChar :: Parser Char
 headerNameChar = noneOf "\n\r:"
 
-especials, tokenchar :: [Char]
-especials = "()<>@,;:\\\"/[]?.="
-tokenchar = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" \\ especials
+tspecials, tokenchar :: [Char]
+tspecials = "()<>@,;:\\\"/[]?="
+tokenchar = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" \\ tspecials
 
 p_token :: Parser String
 p_token = many1 (oneOf tokenchar)
