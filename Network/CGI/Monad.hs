@@ -27,7 +27,7 @@ module Network.CGI.Monad (
   throwCGI, catchCGI, tryCGI, handleExceptionCGI,
  ) where
 
-import Control.Exception as Exception (Exception, try, throwIO)
+import Control.Exception as Exception (SomeException, try, throwIO)
 import Control.Monad (liftM)
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (ReaderT(..), asks)
@@ -92,28 +92,28 @@ runCGIT (CGIT c) = liftM (uncurry (flip (,))) . runWriterT . runReaderT c
 -- * Error handling
 --
 
-instance MonadError Exception (CGIT IO) where
+instance MonadError SomeException (CGIT IO) where
     throwError = throwCGI
     catchError = catchCGI
 
 -- | Throw an exception in a CGI monad. The monad is required to be
 --   a 'MonadIO', so that we can use 'throwIO' to guarantee ordering.
-throwCGI :: (MonadCGI m, MonadIO m) => Exception -> m a
+throwCGI :: (MonadCGI m, MonadIO m) => SomeException -> m a
 throwCGI = liftIO . throwIO
 
 -- | Catches any expection thrown by a CGI action, and uses the given 
 --   exception handler if an exception is thrown.
-catchCGI :: CGI a -> (Exception -> CGI a) -> CGI a
+catchCGI :: CGI a -> (SomeException -> CGI a) -> CGI a
 catchCGI c h = tryCGI c >>= either h return
 
 -- | Catches any exception thrown by an CGI action, and returns either
 --   the exception, or if no exception was raised, the result of the action.
-tryCGI :: CGI a -> CGI (Either Exception a)
+tryCGI :: CGI a -> CGI (Either SomeException a)
 tryCGI (CGIT c) = CGIT (ReaderT (\r -> WriterT (f (runWriterT (runReaderT c r)))))
     where
       f = liftM (either (\ex -> (Left ex,mempty)) (\(a,w) -> (Right a,w))) . try
 
 {-# DEPRECATED handleExceptionCGI "Use catchCGI instead." #-}
 -- | Deprecated version of 'catchCGI'. Use 'catchCGI' instead.
-handleExceptionCGI :: CGI a -> (Exception -> CGI a) -> CGI a
+handleExceptionCGI :: CGI a -> (SomeException -> CGI a) -> CGI a
 handleExceptionCGI = catchCGI

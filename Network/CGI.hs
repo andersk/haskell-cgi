@@ -94,7 +94,7 @@ module Network.CGI (
   , module Network.CGI.Compat
   ) where
 
-import Control.Exception (Exception(..))
+import Control.Exception (Exception(..), SomeException, ErrorCall(..))
 import Control.Monad (liftM)
 import Control.Monad.Trans (MonadIO, liftIO)
 import Data.Char (toUpper)
@@ -184,13 +184,10 @@ handleErrors = flip catchCGI outputException
 
 -- | Output a 500 Internal Server Error with information from
 --   an 'Exception'.
-outputException :: (MonadCGI m,MonadIO m) => Exception -> m CGIResult
+outputException :: (MonadCGI m,MonadIO m) => SomeException -> m CGIResult
 outputException e = outputInternalServerError es
-    where es = case e of
-                 ErrorCall msg  -> [msg]
-                 IOException ie -> ioe ie
-                 _              -> [show e]
-          ioe ie = if isUserError ie then [ioeGetErrorString ie] else [show ie]
+    where es | Just (ErrorCall msg) <- fromException e = [msg]
+             | otherwise                               = [show e]
 
 -- | Output an error page to the user, with the given
 --   HTTP status code in the response. Also logs the error information

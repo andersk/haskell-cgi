@@ -1,7 +1,8 @@
 Name: cgi
-Version: 3001.1.7.1
+Version: 3001.1.7.2
 Copyright: Bjorn Bringert, Andy Gill, Ian Lynagh, Erik Meijer, 
            Sven Panne, Jeremy Shaw
+Category: Network
 Maintainer: bjorn@bringert.net
 Author: Bjorn Bringert
 License: BSD3
@@ -31,13 +32,13 @@ Library
 
   Build-depends: network>=2.0, parsec >= 2.0, mtl >= 1.0, xhtml >= 3000.0.0
   If flag(split-base)
-    Build-depends: base == 3.*, old-time, old-locale, containers
+    Build-depends: base >= 3 && < 5, old-time, old-locale, containers
   Else
     Build-depends: base < 3
   If flag(bytestring-in-base)
     Build-depends: base >= 2 && < 3
   Else
-    Build-depends: base < 2 || == 3.*, bytestring
+    Build-depends: base < 2 || < 5, bytestring
 
 --Executable:     printinput
 --Main-Is:        printinput.hs

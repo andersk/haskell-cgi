@@ -20,7 +20,7 @@ module Network.CGI.Compat (
   ) where
 
 import Control.Concurrent (forkIO)
-import Control.Exception as Exception (Exception,throw,catch,finally)
+import Control.Exception as Exception (SomeException,throw,catch,finally)
 import Control.Monad (unless)
 import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Data.Map as Map
@@ -101,7 +101,7 @@ getRequestInput env req =
       Just "POST" -> takeInput env req
       _ -> maybe BS.empty BS.pack (lookup "QUERY_STRING" env)
 
-abort :: String -> Exception -> IO a
+abort :: String -> SomeException -> IO a
 abort msg e =
     do putStrLn ("Content-type: text/html\n\n" ++
                    "<html><body>" ++ msg ++ "</body></html>")
