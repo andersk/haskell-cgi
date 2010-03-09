@@ -96,6 +96,7 @@ module Network.CGI (
 
 import Control.Exception.Extensible (Exception(..), SomeException, ErrorCall(..))
 import Control.Monad (liftM)
+import Control.Monad.CatchIO (MonadCatchIO)
 import Control.Monad.Trans (MonadIO, liftIO)
 import Data.Char (toUpper)
 import Data.List (intersperse, sort, group)
@@ -174,7 +175,7 @@ redirect url = do setHeader "Location" url
 -- >
 -- > main :: IO ()
 -- > main = runCGI (handleErrors cgiMain)
-handleErrors :: CGI CGIResult -> CGI CGIResult
+handleErrors :: (MonadCGI m, MonadCatchIO m) => m CGIResult -> m CGIResult
 handleErrors = flip catchCGI outputException
 
 --

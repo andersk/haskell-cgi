@@ -27,13 +27,14 @@ module Network.CGI.Monad (
   throwCGI, catchCGI, tryCGI, handleExceptionCGI,
  ) where
 
-import Control.Exception.Extensible as Exception (SomeException, try, throwIO)
+import Prelude hiding (catch)
+import Control.Exception.Extensible as Exception (SomeException, throwIO)
 import Control.Monad (liftM)
+import Control.Monad.CatchIO (MonadCatchIO, block, catch, try, unblock)
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Writer (WriterT(..), tell)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
-import Data.Monoid (mempty)
 import Data.Typeable (Typeable(..), Typeable1(..), 
                       mkTyConApp, mkTyCon)
 
@@ -66,6 +67,11 @@ instance Monad m => Monad (CGIT m) where
 instance MonadIO m => MonadIO (CGIT m) where
     liftIO = lift . liftIO
 
+instance MonadCatchIO m => MonadCatchIO (CGIT m) where
+    CGIT m `catch` h = CGIT (try m) >>= either h return
+    block (CGIT m) = CGIT (block m)
+    unblock (CGIT m) = CGIT (unblock m)
+
 -- | The class of CGI monads. Most CGI actions can be run in
 --   any monad which is an instance of this class, which means that
 --   you can use your own monad transformers to add extra functionality.
@@ -92,7 +98,7 @@ runCGIT (CGIT c) = liftM (uncurry (flip (,))) . runWriterT . runReaderT c
 -- * Error handling
 --
 
-instance MonadError SomeException (CGIT IO) where
+instance MonadCatchIO m => MonadError SomeException (CGIT m) where
     throwError = throwCGI
     catchError = catchCGI
 
@@ -103,17 +109,15 @@ throwCGI = liftIO . throwIO
 
 -- | Catches any expection thrown by a CGI action, and uses the given 
 --   exception handler if an exception is thrown.
-catchCGI :: CGI a -> (SomeException -> CGI a) -> CGI a
-catchCGI c h = tryCGI c >>= either h return
+catchCGI :: (MonadCGI m, MonadCatchIO m) => m a -> (SomeException -> m a) -> m a
+catchCGI = catch
 
 -- | Catches any exception thrown by an CGI action, and returns either
 --   the exception, or if no exception was raised, the result of the action.
-tryCGI :: CGI a -> CGI (Either SomeException a)
-tryCGI (CGIT c) = CGIT (ReaderT (\r -> WriterT (f (runWriterT (runReaderT c r)))))
-    where
-      f = liftM (either (\ex -> (Left ex,mempty)) (\(a,w) -> (Right a,w))) . try
+tryCGI :: (MonadCGI m, MonadCatchIO m) => m a -> m (Either SomeException a)
+tryCGI = try
 
 {-# DEPRECATED handleExceptionCGI "Use catchCGI instead." #-}
 -- | Deprecated version of 'catchCGI'. Use 'catchCGI' instead.
-handleExceptionCGI :: CGI a -> (SomeException -> CGI a) -> CGI a
+handleExceptionCGI :: (MonadCGI m, MonadCatchIO m) => m a -> (SomeException -> m a) -> m a
 handleExceptionCGI = catchCGI

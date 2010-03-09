@@ -35,6 +35,7 @@ Library
     network >= 2.0,
     parsec >= 2.0,
     mtl >= 1.0,
+    MonadCatchIO-mtl,
     xhtml >= 3000.0.0,
     extensible-exceptions
   If flag(split-base)
