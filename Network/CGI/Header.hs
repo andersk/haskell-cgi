@@ -45,9 +45,7 @@ module Network.CGI.Header (
 
 import Control.Monad
 import Data.Char
-import Data.Function
 import Data.List
-import Data.Maybe
 import Data.Monoid
 
 import Text.ParserCombinators.Parsec

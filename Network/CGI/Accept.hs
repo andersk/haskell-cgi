@@ -7,8 +7,6 @@ module Network.CGI.Accept (
   , negotiate
                           ) where
 
-import Control.Monad
-import Data.Char
 import Data.Function
 import Data.List
 import Data.Maybe

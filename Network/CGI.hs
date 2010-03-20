@@ -104,7 +104,6 @@ import qualified Data.Map as Map
 import Network.URI (URI(..), URIAuth(..), nullURI, parseRelativeReference, 
                     escapeURIString, isUnescapedInURI)
 import System.IO (stdin, stdout)
-import System.IO.Error (isUserError, ioeGetErrorString)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
@@ -117,7 +116,7 @@ import Network.CGI.Monad
 import Network.CGI.Protocol
 import Network.CGI.Compat
 
-import Text.XHtml (Html, renderHtml, header, (<<), thetitle, (+++), 
+import Text.XHtml (renderHtml, header, (<<), thetitle, (+++), 
                    body, h1, paragraph, hr, address)
 
 
