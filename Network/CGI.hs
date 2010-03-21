@@ -186,8 +186,9 @@ handleErrors = flip catchCGI outputException
 --   an 'Exception'.
 outputException :: (MonadCGI m,MonadIO m) => SomeException -> m CGIResult
 outputException e = outputInternalServerError es
-    where es | Just (ErrorCall msg) <- fromException e = [msg]
-             | otherwise                               = [show e]
+    where es = case fromException e of
+                 Just (ErrorCall msg) -> [msg]
+                 _ -> [show e]
 
 -- | Output an error page to the user, with the given
 --   HTTP status code in the response. Also logs the error information
