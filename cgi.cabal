@@ -1,10 +1,11 @@
 Name: cgi
-Version: 3001.1.7.2
-Copyright: Bjorn Bringert, Andy Gill, Ian Lynagh, Erik Meijer, 
-           Sven Panne, Jeremy Shaw
+Version: 3001.1.7.3
+Copyright: Bjorn Bringert, Andy Gill, Anders Kaseorg, Ian Lynagh, 
+           Erik Meijer, Sven Panne, Jeremy Shaw
 Category: Network
-Maintainer: bjorn@bringert.net
+Maintainer: Anders Kaseorg <andersk@mit.edu>
 Author: Bjorn Bringert
+Homepage: http://andersk.mit.edu/haskell/cgi/
 License: BSD3
 License-file: LICENSE
 Synopsis: A library for writing CGI programs
