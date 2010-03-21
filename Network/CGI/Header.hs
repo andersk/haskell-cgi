@@ -77,10 +77,10 @@ pHeaders = many pHeader
 pHeader :: Parser (HeaderName, String)
 pHeader = 
     do name <- many1 headerNameChar
-       char ':'
-       many ws1
+       _ <- char ':'
+       _ <- many ws1
        line <- lineString
-       crLf
+       _ <- crLf
        extraLines <- many extraFieldLine
        return (HeaderName name, concat (line:extraLines))
 
@@ -88,7 +88,7 @@ extraFieldLine :: Parser String
 extraFieldLine = 
     do sp <- ws1
        line <- lineString
-       crLf
+       _ <- crLf
        return (sp:line)
 
 getHeaderValue :: (Monad m, HeaderValue a) => String -> Headers -> m a
@@ -108,7 +108,7 @@ showParameters = concatMap f
 
 p_parameter :: Parser (String,String)
 p_parameter = try $
-  do lexeme $ char ';'
+  do _ <- lexeme $ char ';'
      p_name <- lexeme $ p_token
      -- Don't allow parameters named q. This is needed for parsing Accept-X 
      -- headers. From RFC 2616 14.1:
@@ -121,7 +121,7 @@ p_parameter = try $
      --    parameters in Accept. Future media types are discouraged from
      --    registering any parameter named "q".
      when (p_name == "q") pzero
-     lexeme $ char '='
+     _ <- lexeme $ char '='
      -- Workaround for seemingly standardized web browser bug
      -- where nothing is escaped in the filename parameter
      -- of the content-disposition header in multipart/form-data
@@ -171,9 +171,9 @@ instance Ord ContentType where
 
 instance HeaderValue ContentType where
     parseHeaderValue = 
-        do many ws1
+        do _ <- many ws1
            c_type <- p_token
-           char '/'
+           _ <- char '/'
            c_subtype <- lexeme $ p_token
            c_parameters <- many p_parameter
            return $ ContentType (map toLower c_type) (map toLower c_subtype) c_parameters
@@ -202,7 +202,7 @@ data ContentTransferEncoding =
 
 instance HeaderValue ContentTransferEncoding where
     parseHeaderValue = 
-        do many ws1
+        do _ <- many ws1
            c_cte <- p_token
            return $ ContentTransferEncoding (map toLower c_cte)
     prettyHeaderValue (ContentTransferEncoding s) = s
@@ -220,7 +220,7 @@ data ContentDisposition =
 
 instance HeaderValue ContentDisposition where
     parseHeaderValue = 
-        do many ws1
+        do _ <- many ws1
            c_cd <- p_token
            c_parameters <- many p_parameter
            return $ ContentDisposition (map toLower c_cd) c_parameters
@@ -259,7 +259,7 @@ ws1 :: Parser Char
 ws1 = oneOf " \t"
 
 lexeme :: Parser a -> Parser a
-lexeme p = do x <- p; many ws1; return x
+lexeme p = do x <- p; _ <- many ws1; return x
 
 -- | RFC 822 CRLF (but more permissive)
 crLf :: Parser String
@@ -270,9 +270,9 @@ lineString :: Parser String
 lineString = many (noneOf "\n\r")
 
 literalString :: Parser String
-literalString = do char '\"'
+literalString = do _ <- char '\"'
 		   str <- many (noneOf "\"\\" <|> quoted_pair)
-		   char '\"'
+		   _ <- char '\"'
 		   return str
 
 -- No web browsers seem to implement RFC 2046 correctly,
@@ -282,10 +282,10 @@ literalString = do char '\"'
 -- Note that this eats everything until the last double quote on the line.
 buggyLiteralString :: Parser String
 buggyLiteralString = 
-    do char '\"'
+    do _ <- char '\"'
        str <- manyTill anyChar (try lastQuote)
        return str
-  where lastQuote = do char '\"' 
+  where lastQuote = do _ <- char '\"' 
                        notFollowedBy (try (many (noneOf "\"") >> char '\"'))
 
 headerNameChar :: Parser Char
@@ -305,5 +305,5 @@ p_text :: Parser Char
 p_text = oneOf text_chars
 
 quoted_pair :: Parser Char
-quoted_pair = do char '\\'
+quoted_pair = do _ <- char '\\'
 		 p_text

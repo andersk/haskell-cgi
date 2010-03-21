@@ -34,9 +34,9 @@ class Eq a => Acceptable a where
 instance HeaderValue a => HeaderValue (Accept a) where
     parseHeaderValue = fmap Accept $ sepBy p (lexeme (char ','))
         where p = do a <- parseHeaderValue
-                     q <- option 1 $ do lexeme $ char ';'
-                                        lexeme $ char 'q'
-                                        lexeme $ char '='
+                     q <- option 1 $ do _ <- lexeme $ char ';'
+                                        _ <- lexeme $ char 'q'
+                                        _ <- lexeme $ char '='
                                         lexeme pQuality
                      return (a,q)
               pQuality = (char '0' >> option "0" (char '.' >> many digit) >>= \ds -> return (read ("0." ++ ds ++ "0")))

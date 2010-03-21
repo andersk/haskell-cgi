@@ -59,7 +59,7 @@ pwrapper pid f = do sock <- listenOn pid
 acceptConnections :: (Handle -> IO ()) -> Socket -> IO ()
 acceptConnections fn sock = do
   (h, SockAddrInet _ _) <- accept' sock
-  forkIO (fn h `finally` (hClose h))
+  _ <- forkIO (fn h `finally` (hClose h))
   acceptConnections fn sock
 
 accept' :: Socket                 -- Listening Socket
