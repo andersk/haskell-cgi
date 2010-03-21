@@ -20,7 +20,7 @@ module Network.CGI.Compat (
   ) where
 
 import Control.Concurrent (forkIO)
-import Control.Exception as Exception (SomeException,throw,catch,finally)
+import Control.Exception.Extensible as Exception (SomeException,throw,catch,finally)
 import Control.Monad (unless)
 import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Data.Map as Map

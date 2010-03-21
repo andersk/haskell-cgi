@@ -94,7 +94,7 @@ module Network.CGI (
   , module Network.CGI.Compat
   ) where
 
-import Control.Exception (Exception(..), SomeException, ErrorCall(..))
+import Control.Exception.Extensible (Exception(..), SomeException, ErrorCall(..))
 import Control.Monad (liftM)
 import Control.Monad.Trans (MonadIO, liftIO)
 import Data.Char (toUpper)

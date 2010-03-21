@@ -30,7 +30,12 @@ Library
   Extensions: MultiParamTypeClasses
   ghc-options: -Wall
 
-  Build-depends: network>=2.0, parsec >= 2.0, mtl >= 1.0, xhtml >= 3000.0.0
+  Build-depends:
+    network >= 2.0,
+    parsec >= 2.0,
+    mtl >= 1.0,
+    xhtml >= 3000.0.0,
+    extensible-exceptions
   If flag(split-base)
     Build-depends: base >= 3 && < 5, old-time, old-locale, containers
   Else
