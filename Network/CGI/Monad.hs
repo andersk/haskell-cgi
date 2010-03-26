@@ -68,7 +68,7 @@ instance MonadIO m => MonadIO (CGIT m) where
     liftIO = lift . liftIO
 
 instance MonadCatchIO m => MonadCatchIO (CGIT m) where
-    CGIT m `catch` h = CGIT (try m) >>= either h return
+    CGIT m `catch` h = CGIT $ m `catch` (unCGIT . h)
     block (CGIT m) = CGIT (block m)
     unblock (CGIT m) = CGIT (unblock m)
 
