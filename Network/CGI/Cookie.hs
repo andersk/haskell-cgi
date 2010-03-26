@@ -5,7 +5,7 @@
 --                (c) Ian Lynagh 2005
 -- License     :  BSD-style
 --
--- Maintainer  :  Bjorn Bringert <bjorn@bringert.net>
+-- Maintainer  :  Anders Kaseorg <andersk@mit.edu>
 -- Stability   :  experimental
 -- Portability :  portable
 --

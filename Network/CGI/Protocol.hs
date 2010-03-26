@@ -4,7 +4,7 @@
 -- Copyright   :  (c) Bjorn Bringert 2006
 -- License     :  BSD-style
 --
--- Maintainer  :  bjorn@bringert.net
+-- Maintainer  :  Anders Kaseorg <andersk@mit.edu>
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
