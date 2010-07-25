@@ -39,7 +39,7 @@ import Data.Map (Map)
 import Data.Maybe (fromMaybe, listToMaybe, isJust)
 import Network.URI (unEscapeString,escapeURIString,isUnescapedInURI)
 import System.Environment (getEnvironment)
-import System.IO (Handle, hPutStrLn, stderr, hFlush)
+import System.IO (Handle, hPutStrLn, stderr, hFlush, hSetBinaryMode)
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
@@ -104,7 +104,8 @@ hRunCGI :: MonadIO m =>
         -> (CGIRequest -> m (Headers, CGIResult)) -- ^ CGI action
         -> m ()
 hRunCGI env hin hout f = 
-    do inp <- liftIO $ BS.hGetContents hin
+    do liftIO $ hSetBinaryMode hin True
+       inp <- liftIO $ BS.hGetContents hin
        outp <- runCGIEnvFPS env inp f
        liftIO $ BS.hPut hout outp
        liftIO $ hFlush hout
