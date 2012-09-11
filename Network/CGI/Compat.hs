@@ -89,7 +89,7 @@ connectToCGIScript host portId
                    (\ e -> abort "Cannot connect to CGI daemon." e)
           BS.hPut h str >> hPutStrLn h ""
           (sendBack h `finally` hClose h)
-               `Prelude.catch` (\e -> unless (isEOFError e) (ioError e))
+               `Exception.catch` (\e -> unless (isEOFError e) (ioError e))
 
 -- | Returns the query string, or the request body if it is
 --   a POST request, or the empty string if there is an error.
