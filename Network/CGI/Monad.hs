@@ -27,7 +27,12 @@ module Network.CGI.Monad (
   throwCGI, catchCGI, tryCGI, handleExceptionCGI,
  ) where
 
-import Control.Exception.Extensible as Exception (SomeException, try, throwIO)
+#if MIN_VERSION_base(4,0,0)
+import Control.Exception
+#else
+import Control.Exception.Extensible
+#endif
+  as Exception (SomeException, try, throwIO)
 import Control.Monad (liftM)
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (ReaderT(..), asks)

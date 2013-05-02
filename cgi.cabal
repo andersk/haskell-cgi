@@ -16,6 +16,7 @@ Cabal-Version: >=1.2
 
 Flag split-base
 Flag bytestring-in-base
+Flag extensible-exceptions-in-base
 
 Library
   Exposed-Modules:
@@ -28,15 +29,16 @@ Library
     Network.CGI.Accept,
     Network.CGI.Multipart,
     Network.CGI.Header
-  Extensions: MultiParamTypeClasses
+  Extensions:
+    CPP,
+    MultiParamTypeClasses
   ghc-options: -Wall
 
   Build-depends:
     network >= 2.0,
     parsec >= 2.0,
     mtl >= 1.0,
-    xhtml >= 3000.0.0,
-    extensible-exceptions
+    xhtml >= 3000.0.0
   If flag(split-base)
     Build-depends: base >= 3 && < 5, old-time, old-locale, containers
   Else
@@ -45,6 +47,10 @@ Library
     Build-depends: base >= 2 && < 3
   Else
     Build-depends: base < 2 || < 5, bytestring
+  If flag(extensible-exceptions-in-base)
+    Build-depends: base >= 4
+  Else
+    Build-depends: base < 4, extensible-exceptions
 
 --Executable:     printinput
 --Main-Is:        printinput.hs
