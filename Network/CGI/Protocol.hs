@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+#if MIN_VERSION_base(4,7,0)
+{-# LANGUAGE DeriveDataTypeable #-}
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.CGI.Protocol
@@ -44,7 +49,11 @@ import System.IO (Handle, hPutStrLn, stderr, hFlush, hSetBinaryMode)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
 
+#if MIN_VERSION_base(4,7,0)
+import Data.Typeable (Typeable())
+#else
 import Data.Typeable (Typeable(..), mkTyConApp, mkTyCon)
+#endif
 
 import Network.CGI.Header
 import Network.CGI.Multipart
@@ -70,11 +79,14 @@ data CGIRequest =
                 -- "multipart\/form-data" format.
                 cgiRequestBody :: ByteString
                }
+#if MIN_VERSION_base(4,7,0)
+    deriving (Show, Typeable)
+#else
     deriving (Show)
 
 instance Typeable CGIResult where
     typeOf _ = mkTyConApp (mkTyCon "Network.CGI.Protocol.CGIResult") []
-
+#endif
 -- | The value of an input parameter, and some metadata.
 data Input = Input {
                     inputValue :: ByteString,
