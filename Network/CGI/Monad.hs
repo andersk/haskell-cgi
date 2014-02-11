@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.CGI.Monad
@@ -40,8 +41,12 @@ import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Writer (WriterT(..), tell)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
+#if MIN_VERSION_base(4,7,0)
+import Data.Typeable
+#else
 import Data.Typeable (Typeable(..), Typeable1(..), 
-                      mkTyConApp, mkTyCon)
+                      mkTyConApp, mkTyCon)		      
+#endif		      
 
 import Network.CGI.Protocol
 
@@ -55,10 +60,14 @@ type CGI a = CGIT IO a
 
 -- | The CGIT monad transformer.
 newtype CGIT m a = CGIT { unCGIT :: ReaderT CGIRequest (WriterT Headers m) a }
+#if MIN_VERSION_base(4,7,0)
+			deriving (Typeable)
 
+#else
 instance (Typeable1 m, Typeable a) => Typeable (CGIT m a) where
     typeOf _ = mkTyConApp (mkTyCon "Network.CGI.Monad.CGIT") 
                 [typeOf1 (undefined :: m a), typeOf (undefined :: a)]
+#endif		
 
 instance (Functor m, Monad m) => Functor (CGIT m) where
     fmap f c = CGIT (fmap f (unCGIT c))
