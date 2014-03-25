@@ -1,4 +1,9 @@
 {-# OPTIONS_GHC -fglasgow-exts #-}
+#if __GLASGOW_HASKELL__ < 708
+#else
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+#endif
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.CGI.Monad
@@ -41,7 +46,8 @@ import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Writer (WriterT(..), tell)
 import Control.Monad.Trans (MonadTrans, MonadIO, liftIO, lift)
 import Data.Typeable (Typeable(..), Typeable1(..), 
-                      mkTyConApp, mkTyCon)
+                      mkTyConApp)
+import qualified Data.Typeable as T
 
 import Network.CGI.Protocol
 
@@ -56,9 +62,22 @@ type CGI a = CGIT IO a
 -- | The CGIT monad transformer.
 newtype CGIT m a = CGIT { unCGIT :: ReaderT CGIRequest (WriterT Headers m) a }
 
+cgiTyCon :: T.TyCon
+#if MIN_VERSION_base(4,4,0)
+cgiTyCon = T.mkTyCon3 "cgi" "Network.CGI.Monad" "CGIT"
+#else
+cgiTyCon = T.mkTyCon "Network.CGI.Monad.CGIT"
+#endif
+{-# NOINLINE cgiTyCon #-}
+
+#if __GLASGOW_HASKELL__ < 708
 instance (Typeable1 m, Typeable a) => Typeable (CGIT m a) where
-    typeOf _ = mkTyConApp (mkTyCon "Network.CGI.Monad.CGIT") 
+    typeOf _ = mkTyConApp cgiTyCon
                 [typeOf1 (undefined :: m a), typeOf (undefined :: a)]
+#else
+deriving instance Typeable CGIT
+#endif
+
 
 instance (Functor m, Monad m) => Functor (CGIT m) where
     fmap f c = CGIT (fmap f (unCGIT c))
