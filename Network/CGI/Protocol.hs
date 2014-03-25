@@ -1,3 +1,8 @@
+#if __GLASGOW_HASKELL__ < 708
+#else
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+#endif
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Network.CGI.Protocol
@@ -44,7 +49,8 @@ import System.IO (Handle, hPutStrLn, stderr, hFlush, hSetBinaryMode)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
 
-import Data.Typeable (Typeable(..), mkTyConApp, mkTyCon)
+import Data.Typeable (Typeable(..), mkTyConApp)
+import qualified Data.Typeable as T
 
 import Network.CGI.Header
 import Network.CGI.Multipart
@@ -71,9 +77,22 @@ data CGIRequest =
                 cgiRequestBody :: ByteString
                }
     deriving (Show)
+   
 
+cgiTyCon :: T.TyCon
+#if MIN_VERSION_base(4,4,0)
+cgiTyCon = T.mkTyCon3 "cgi" "Network.CGI.Protocol" "CGIResult"
+#else
+cgiTyCon = T.mkTyCon "Network.CGI.Protocol.CGIResult"
+#endif
+{-# NOINLINE cgiTyCon #-}
+
+#if __GLASGOW_HASKELL__ < 708
 instance Typeable CGIResult where
-    typeOf _ = mkTyConApp (mkTyCon "Network.CGI.Protocol.CGIResult") []
+    typeOf _ = mkTyConApp cgiTyCon []
+#else
+deriving instance Typeable CGIResult
+#endif
 
 -- | The value of an input parameter, and some metadata.
 data Input = Input {
